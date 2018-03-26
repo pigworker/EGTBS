@@ -32,6 +32,7 @@
 %subst keyword a = "\mathkw{" a "}"
 %subst conid a = "\V{" a "}"
 %subst varid a = "\V{" a "}"
+%format inductive = "\mathkw{inductive}"
 %format constructor = "\mathkw{constructor}"
 %format pattern = "\mathkw{pattern}"
 %format rewrite = "\mathkw{rewrite}"
@@ -41,14 +42,6 @@
 %if False
 \begin{code}
 module EGTBS where
-\end{code}
-%endif
-
-%if False
-\begin{code}
-
-data Zero : Set where
-
 \end{code}
 %endif
 
@@ -69,11 +62,13 @@ the whole scope.
 
 \section{Basic Equipment}
 
-We shall need the means to construct tuples. The empty tuple is given by
-the \emph{record} type with no fields, which Agda recognizes as uniquely inhabited.
-Dependent pairing is by means of the |Sg| type, abbreviated by |*| in its non-dependent special case.
 %format Set = "\D{Set}"
+%format Zero = "\D{Zero}"
 %format One = "\D{One}"
+%format Two = "\D{Two}"
+%format tt = "\C{t\!t}"
+%format ff = "\C{f\!f}"
+%format Tt = "\F{T\!t}"
 %format <> = "\C{\langle\rangle}"
 %format Sg = "\D{\Upsigma}"
 %format * = "\F{\times}"
@@ -84,18 +79,27 @@ Dependent pairing is by means of the |Sg| type, abbreviated by |*| in its non-de
 %format _,_ = _ , _
 %format ! = "\C{!}"
 %format !_ = ! _
+We shall need finite types |Zero|, |One|, and |Two|, named for their cardinality,
+and the reflection of |Two| as a set of evidence for `being |tt|'.
+Dependent pairing is by means of the |Sg| type, abbreviated by |*| in its non-dependent special case.
 \vspace*{ -0.2in} \\
 %\noindent
 \parbox[t]{2.7in}{
 \begin{code}
-record One : Set where constructor <>
+data    Zero  : Set where
+record  One   : Set where constructor <>
+data    Two   : Set where tt ff : Two
+
+Tt : Two -> Set
+Tt tt  = One
+Tt ff  = Zero
 \end{code}}
 \parbox[t]{3in}{
 \begin{code}
 record Sg (S : Set)(T : S -> Set) : Set where
   constructor _,_
   field fst : S; snd : T fst
-open Sg public
+open Sg
 _*_ : Set -> Set -> Set
 S * T = Sg S \ _ -> T
 pattern !_ t = _ , t
@@ -175,7 +179,7 @@ not the full type information that one would find in a context.
 
 The morphisms of $\OPE$ give an embedding from a source
 scope to a target scope. Colloquially, we may call such embeddings
-`thinnings', as they dilute with variables of the source scope with
+`thinnings', as they dilute the variables of the source scope with
 more variables.  Equally, and usefully, we may see such a morphism as
 expelling variables from the target scope, leaving a particular
 selection as the source scope.  I write the step constructors postfix,
@@ -393,12 +397,13 @@ in $(S, f) \to (T, g)$ is some $h : S \to T$ such that $f = h;g$.
 ~
 
 That is, the morphisms are \emph{triangles}. A seasoned dependently typed
-programmer will be nervous at the sight of a definition like
+programmer will be nervous at a definition like the following
+(where the |_| after |Sg| asks Agda to compute the type |iz <= jz| of |th|):
 %format ->/ = "\F{\to_{\slash}}"
 %format _->/_ = _ ->/ _
 \begin{spec}
 _->/_ :  forall {K}{iz jz kz : Bwd K} -> (iz <= kz) -> (jz <= kz) -> Set
-th ->/ ph = Sg _ \ ps -> (ps <&= ph) == th
+ps ->/ ph = Sg _ \ th -> (th <&= ph) == ps
 \end{spec}
 because the equation gives us few options when it comes to manipulating
 triangles. Dependent pattern matching relies on \emph{unification} of
@@ -460,8 +465,7 @@ egTri :  forall {K}{k0 k1 k2 k3 k4 : K} ->  Tri {kz = B0 - k0 - k1 - k2 - k3 - k
 egTri = tzzz tsss t-'' t's' t-'' tsss
 \end{code}
 
-We obtain a definition of morphisms in the slice as triangles. (The |Sg _| tells Agda
-to infer the type of |ps|, which is forced by its use as an index of |Tri|.)
+We obtain a definition of morphisms in the slice as triangles.
 \begin{code}
 _->/_ :  forall {K}{iz jz kz : Bwd K} -> (iz <= kz) -> (jz <= kz) -> Set
 ps ->/ ph = Sg _ \ th -> Tri th ph ps
@@ -807,8 +811,8 @@ In particular, things-with-thinnings are easy to thin further, indeed,
 parametrically so. In other words, |(T /)| is uniformly a functor from
 $\OPE$ to |Set|.
 \begin{code}
-thin/ : forall {K T}{iz jz : Bwd K} -> T / iz -> iz <= jz -> T / jz
-thin/ t th = mult/ (t ^ th)
+thin/ : forall {K T}{iz jz : Bwd K} -> iz <= jz -> T / iz -> T / jz
+thin/ th t = mult/ (t ^ th)
 \end{code}
 
 \newcommand{\Kleisli}[1]{\textbf{Kleisli}(#1)}
@@ -917,7 +921,7 @@ of the bitvectors.
 
 \paragraph{Coproduct.~} Objects $S$ and $T$ of category $\mathbb{C}$ have
 a coproduct object $S + T$ if there are morphisms $l\in \mathbb{C}(S, S + T)$ and
-$r\in \mathbb{C}(S, S + T)$ such that every pair
+$r\in \mathbb{C}(T, S + T)$ such that every pair
 $f\in \mathbb{C}(S, U)$ and $g\in \mathbb{C}(T, U)$ factors
 through a unique $h\in \mathbb{C}(S + T, U)$ so that
 $f = l;h$ and $g = r;h$. In |Set|, we may take $S + T$ to be
@@ -945,15 +949,6 @@ Fortunately, we shall get what we need. $\OPE$ may not have coproducts, but its
 \emph{slices} do.
 %It is not the case that colimit structure in $\mathbb{C}/I$
 %arises \emph{only} via inheritance from $\mathbb{C}$.
-Examine the data.
-We have two subscopes of some |kz|, |th : iz <= kz| and |ph : jz <= kz|. Their
-coproduct must be some |ps : ijz <= kz|, where our $l$ and $r$ must be
-triangles |Tri th' ps th| and |Tri ph' ps ph|, giving us morphisms in
-|th ->/ ps| and |ph ->/ ps|, respectively. Intuitively, we should choose |ps|
-to be the pointwise disjunction of |th| and |ph|, so that |ijz| is as small
-as possible: |th'| and |ph'| will then \emph{cover} |ijz|. Let us define this
-notion of covering inductively, so we build diagrams and
-reason by pattern matching.
 %format Cover = "\D{Cover}"
 %format c's = "\C{c\apo s}"
 %format cs' = "\C{cs\apo}"
@@ -962,15 +957,24 @@ reason by pattern matching.
 %format _cs' = _ cs'
 %format _css = _ css
 %format czz = "\C{czz}"
+Examine the data.
+We have two subscopes of some |kz|, |th : iz <= kz| and |ph : jz <= kz|. Their
+coproduct must be some |ps : ijz <= kz|, where our $l$ and $r$ must be
+triangles |Tri th' ps th| and |Tri ph' ps ph|, giving us morphisms in
+|th ->/ ps| and |ph ->/ ps|, respectively. Intuitively, we should choose |ps|
+to be the pointwise disjunction of |th| and |ph|, so that |ijz| is as small
+as possible: |th'| and |ph'| will then \emph{cover} |ijz|. The flag, |ov|,
+determines whether \emph{overlap} is permitted: this should be |tt| for
+coproducts, but |ov = ff| allows the notion of \emph{partition}, too.
 \begin{code}
-data Cover {K} : {iz jz ijz : Bwd K} -> iz <= ijz -> jz <= ijz -> Set where
+data Cover {K}(ov : Two) : {iz jz ijz : Bwd K} -> iz <= ijz -> jz <= ijz -> Set where
   _c's  : forall {iz jz ijz k}{th : iz <= ijz}{ph : jz <= ijz} ->
-            Cover th ph -> Cover {ijz = _ - k}  (th o')  (ph os)
+            Cover ov th ph -> Cover ov {ijz = _ - k}  (th o')  (ph os)
   _cs'  : forall {iz jz ijz k}{th : iz <= ijz}{ph : jz <= ijz} ->
-            Cover th ph -> Cover {ijz = _ - k}  (th os)  (ph o')
-  _css  : forall {iz jz ijz k}{th : iz <= ijz}{ph : jz <= ijz} ->
-            Cover th ph -> Cover {ijz = _ - k}  (th os)  (ph os)
-  czz   : Cover oz oz
+            Cover ov th ph -> Cover ov {ijz = _ - k}  (th os)  (ph o')
+  _css  : forall {iz jz ijz k}{th : iz <= ijz}{ph : jz <= ijz}{both : Tt ov} ->
+            Cover ov th ph -> Cover ov {ijz = _ - k}  (th os)  (ph os)
+  czz   : Cover ov oz oz
 \end{code}
 %if False
 \begin{code}
@@ -989,7 +993,7 @@ cop :  forall {K}{kz iz jz : Bwd K}
        (th : iz <= kz)(ph : jz <= kz) ->
        Sg _ \ ijz -> Sg (ijz <= kz) \ ps ->
        Sg (iz <= ijz) \ th' -> Sg (jz <= ijz) \ ph' ->
-       Tri th' ps th * Cover th' ph' * Tri ph' ps ph
+       Tri th' ps th * Cover tt th' ph' * Tri ph' ps ph
 \end{code}}
 \parbox{2in}{
 \[\xymatrix{
@@ -1012,7 +1016,7 @@ some |ps'| must induce a (unique) morphism from |ps| to |ps'|.
 \begin{code}
 copU :  forall {K}{kz iz jz ijz : Bwd K}
         {th : iz <= kz}{ph : jz <= kz}{ps : ijz <= kz}{th' : iz <= ijz}{ph' : jz <= ijz}->
-        Tri th' ps th -> Cover th' ph' -> Tri ph' ps ph ->
+        Tri th' ps th -> Cover tt th' ph' -> Tri ph' ps ph ->
         forall {ijz'}{ps' : ijz' <= kz} -> th ->/ ps' -> ph ->/ ps' -> ps ->/ ps'
 \end{code}
 The construction goes by induction on the triangles which share the edge |ps'|
@@ -1047,7 +1051,7 @@ The payoff from this construction is the notion of \emph{relevant pair}:
 \begin{code}
 record _*R_ {K}(S T : (Cix K))(ijz : Bwd K) : Set where -- |S *R T : (Cix K)|
   constructor pair
-  field  outl : S / ijz;  outr : T / ijz;  cover : Cover (thinning outl) (thinning outr)
+  field  outl : S / ijz;  outr : T / ijz;  cover : Cover tt (thinning outl) (thinning outr)
 
 _,R_ : forall {K}{S T : (Cix K)}{kz} -> S / kz -> T / kz -> (S *R T) / kz
 (s ^ th) ,R (t ^ ph) = let ! ps , th' , ph' , _ , c , _ = cop th ph in pair (s ^ th') (t ^ ph') c ^ ps
@@ -1194,6 +1198,8 @@ left, the argument goes right, and the environment is shared.
 %format Scope = "\F{Scope}"
 %format => = "\C{\Rightarrow}"
 %format _=>_ = _ => _
+%format scope = "\F{scope}"
+%format sort = "\F{sort}"
 There is nothing specific to the $\lambda$-calculus about de Bruijn
 representation or its co-de-Bruijn counterpart. We may develop the
 notions generically for multisorted syntaxes. If the sorts of our
@@ -1201,11 +1207,13 @@ syntax are drawn from set $I$, then we may characterize terms-with-binding
 as inhabiting |Kind|s |kz => i|, which specify an extension of the scope
 with new bindings |kz| and the sort |i| for the body of the binder.
 \begin{code}
-data Kind (I : Set) : Set where _=>_ : Bwd (Kind I) -> I -> Kind I
+record Kind (I : Set) : Set where  inductive; constructor _=>_
+                                   field scope : Bwd (Kind I); sort : I
 \end{code}
 %if False
 \begin{code}
 infix 6 _=>_
+open Kind
 \end{code}
 %endif
 Notice that |Kind|s offer higher-order abstraction: a bound variable itself
@@ -1319,10 +1327,10 @@ them as strictly positive operators in some |R| which gives the semantics
 to |RecD|. In recursive positions, the scope grows by the bindings demanded by the given |Kind|.
 \begin{code}
 [!_!!_!] : forall {I} -> Desc I -> (I -> (Cix (Kind I))) -> (Cix (Kind I))
-[! RecD (jz => i)  !! R !] kz = R i (kz ++ jz)
-[! SgD S T         !! R !] kz = Sg (Data S) \ s -> [! T s !! R !] kz
-[! OneD            !! R !] kz = One
-[! S *D T          !! R !] kz = [! S !! R !] kz * [! T !! R !] kz
+[! RecD k   !! R !] kz = R (sort k) (kz ++ scope k)
+[! SgD S T  !! R !] kz = Sg (Data S) \ s -> [! T s !! R !] kz
+[! OneD     !! R !] kz = One
+[! S *D T   !! R !] kz = [! S !! R !] kz * [! T !! R !] kz
 \end{code}
 %Note that we work with scope-indexed sets and an index |kz| giving the
 %kinds of the variables in scope. 
@@ -1348,7 +1356,7 @@ for the demanded sort, with subterms in recursive positions.
 %format ] = "\C{]}"
 %format [_] = [ _ ]
 \begin{code}
-data Tm {I}(D : I -> Desc I)(i : I)(kz : Bwd (Kind I)) : Set where -- |Tm D i : (Cix (Kind I))|
+data Tm {I}(D : I -> Desc I)(i : I) kz : Set where -- |Tm D i : (Cix (Kind I))|
   _#$_  : forall {jz} -> (jz => i) <- kz ->  [! SpD jz  !! Tm D !] kz ->  Tm D i kz
   [_]   :                                    [! D i     !! Tm D !] kz ->  Tm D i kz
 infixr 5 _#$_
@@ -1378,10 +1386,10 @@ binding sites make clear which variables are to be used. Let us work in
 %format # = "\C{\scriptstyle \#}"
 \begin{code}
 [!_!!_!]R : forall {I} -> Desc I -> (I -> (Cix (Kind I))) -> (Cix (Kind I))
-[! RecD (jz => i)  !! R !]R = jz !- R i
-[! SgD S T         !! R !]R = \ kz -> Sg (Data S) \ s -> [! T s !! R !]R kz
-[! OneD            !! R !]R = OneR
-[! S *D T          !! R !]R = [! S !! R !]R *R [! T !! R !]R
+[! RecD k   !! R !]R = scope k !- R (sort k)
+[! SgD S T  !! R !]R = \ kz -> Sg (Data S) \ s -> [! T s !! R !]R kz
+[! OneD     !! R !]R = OneR
+[! S *D T   !! R !]R = [! S !! R !]R *R [! T !! R !]R
 
 data TmR {I}(D : I -> Desc I)(i : I) : (Cix (Kind I)) where
   #     : forall {jz} -> (VaR (jz => i) *R  [! SpD jz  !! TmR D !]R)  -:>  TmR D i
@@ -1403,172 +1411,184 @@ codes OneD              <>                = <>R
 codes (S *D T)          (ss , ts)         = codes S ss ,R codes T ts
 \end{code}
 
+
+\section{Hereditary Substitution for Co-de-Bruijn Metasyntax}
+
+%format Im = "\F{Im}"
+%format KB = "\F{KB}"
+%format HSub = "\D{HSub}"
+%format pass = "\F{pass}"
+%format act = "\F{act}"
+%format passive = "\F{passive}"
+%format active = "\F{active}"
+%format parti = "\F{parti}"
+%format actBnd = "\F{actBnd}"
+%format passTrg = "\F{passTrg}"
+%format images = "\F{images}"
+
+Let us develop the appropriate notion of substitution for our metasyntax, which is \emph{hereditary}
+in the sense of Watkins et al.~\cite{DBLP:conf/types/WatkinsCPW03}, as substituting a higher-kinded
+variable requires us further to substitute its actual for its formal parameters.
+
+There is some subtlety to the construction of the record type |HSub| of hereditary substitutions.
+We may |parti|tion the source scope into |passive| variables, which embed into the target,
+and |active| variables for which we have an environment |images| appropriate to their kinds.
+The |HSub| type is indexed by a third scope which bounds the active kinds, by way of
+ensuring \emph{termination}.
+\begin{code}
+record HSub {I} D (src trg bnd : Bwd (Kind I)) : Set where
+  field  pass act   : Bwd (Kind I)             ; passive  : pass  <= src  ; active  : act <= src
+         parti  : Cover ff passive active  ; passTrg  : pass  <= trg  ; actBnd  : act <= bnd
+         images     : All (\ k -> (scope k !- TmR D (sort k)) / trg) act
+\end{code}
+
 %if False
-
-
-The |code| translations of |combKD| and |combSD| are, respectively,
-\begin{spec}
-[ lam , oz os \\ [ lam , oz o' \\ # (only <[ czz cs' ]> <>) ] ] ^ oz
-\end{spec}
-and
-\begin{spec}
-[  lam , oz os \\  [ lam , oz os \\  [ lam , oz os \\
-   [ app
-   ,  (  (oz \\ [ app , ((oz \\ # (only <[ czz cs' ]> <>))  <[ czz cs' c's ]>  (oz \\ # (only <[ czz cs' ]> <>))) ])
-         <[ czz cs' c's css ]>
-         (oz \\ [ app , ((oz \\ # (only <[ czz cs' ]> <>))  <[ czz cs' c's ]>  (oz \\ # (only <[ czz cs' ]> <>))) ]))
-   ]
-]                  ]                 ] ^ oz
-\end{spec}
-exactly as we hand-coded them, above, with a little extra noise, |oz \\|, recording the fact that |app| binds
-no variables in either function or argument subterms.
-
-
-
-\begin{spec}
-_<??=_ : forall {I R}{iz jz kz : Scope I} -> iz <= jz -> [! SpD jz !! R !]RR / kz -> [! SpD iz !! R !]RR / kz
-oz <??= (<> ^ ps) = <>R
-(th os) <??= ((rz ^ phl) <-> (r ^ phr) ! _ ^ ps) = (th <??= (rz ^ (phl <&= ps))) ,RR (r ^ (phr <&= ps))
-(th o') <??= ((rz ^ phl) <-> (r ^ phr) ! _ ^ ps) = th <??= (rz ^ (phl <&= ps))
-
-data Deal {K} : Bwd K -> Bwd K -> Bwd K -> Set where
-  dzz : Deal B0 B0 B0
-  ds' : forall {iz i jz kz} -> Deal iz jz kz -> Deal (iz - i) jz (kz - i)
-  d's : forall {iz jz j kz} -> Deal iz jz kz -> Deal iz (jz - j) (kz - j)
-
-dealRefine : forall {K}{iz' jz' kz kz' : Bwd K} -> kz <= kz' -> Deal iz' jz' kz' ->
-  Sg _ \ iz -> Sg _ \ jz -> iz <= iz' * Deal iz jz kz * jz <= jz'
-dealRefine oz dzz = B0 , B0 , oz , dzz , oz
-dealRefine (ps os) (ds' de) with dealRefine ps de
-... | _ , _ , th , ga , ph = _ , _ , th os , ds' ga , ph
-dealRefine (ps os) (d's de) with dealRefine ps de
-... | _ , _ , th , ga , ph = _ , _ , th , d's ga , ph os
-dealRefine (ps o') (ds' de) with dealRefine ps de
-... | _ , _ , th , ga , ph = _ , _ , th o' , ga , ph
-dealRefine (ps o') (d's de) with dealRefine ps de
-... | _ , _ , th , ga , ph = _ , _ , th , ga , ph o'
-
-TmK : forall {I}(D : I -> Desc I)(kz : Scope I)(k : Kind I) -> Set
-TmK D kz (jz => i) = (jz !- TmR D i) / kz
-
-wTmK : forall {I}{D : I -> Desc I}{kz kz' : Scope I} -> kz <= kz' -> {k : Kind I} -> TmK D kz k -> TmK D kz' k
-wTmK th {jz => i} t = thin/ t th
-
-record Morph {I}(D : I -> Desc I)(iz kz : Scope I) : Set where
-  constructor _<:_$>_
-  field
-    {leave write} : Scope I
-    leaven  : leave <= kz
-    fate : Deal leave write iz
-    written : All (TmK D kz) write
-open Morph
-
-
-record MorphR {I}(D : I -> Desc I)(iz kz : Scope I) : Set where
-  constructor mor
-  field
-    {leave write} : Scope I
-    leaven  : leave <= kz
-    fate : DealR leave write iz
-    written : [! SpD write !! TmRR D !]RR / kz
-open MorphR
-
-morphRefine : forall {I}{D : I -> Desc I}{iz iz' kz}(th : iz <= iz')(m : Morph D iz' kz) ->
-  Sg (Morph D iz kz) \ m' -> write m' <= write m
-morphRefine {I}{D}{iz}{iz'}{jz} ps (th' <: de $> pz) with dealRefine ps de
-... | le , wr , th , ga , ph = (th <&= th') <: ga $> (ph <?= pz) , ph
-
-morR : forall {I}{D : I -> Desc I}{hz iz iz' kz}(th : iz <= iz') ->
-       (Sg (MorphR D iz' kz) \ m -> write m <= hz) -> (Sg (MorphR D iz kz) \ m -> write m <= hz)
-morR ps (mor th (psl , psr , d') sz , ze) with mkINT psl ps | mkINT psr ps | lemma (\ a b -> Tt (a <+> b)) psl psr d' ps
-... | _ , psll , pslr , ql | _ , psrl , psrr , qr | d = mor (psll <&= th) (pslr , psrr , d) (psrl <??= sz) , psrl <&= ze 
-
-
-data Hered {I}(kz : Scope I) : Set where
-  hered : (forall {jz i} -> (jz => i) <- kz -> Hered jz) -> Hered kz
-here : forall {I}{kz : Scope I} -> Hered kz -> forall {jz i} -> (jz => i) <- kz -> Hered jz
-here (hered h) = h
-
-inherit : forall {I}(kz : Scope I) -> Hered kz
-inherit B0 = hered \ ()
-inherit (kz - (jz => i)) = hered \  {
-  (x os) -> inherit jz              ;
-  (x o') -> here (inherit kz) x     }
-
-spAll :  forall {I}{D : I -> Desc I} jz {kz : Scope I} -> [! SpD jz !! TmR D !]R / kz -> All (TmK D kz) jz
-spAll B0 (<> ^ th) = B0
-spAll (jz - (iz => i)) ((ts <[ ch ]> t) ^ th) = spAll jz (ts ^ (lope ch <&= th)) - (t ^ (rope ch <&= th))
-
-dealL : forall {K}{iz : Bwd K} -> Deal iz B0 iz
-dealL {iz = B0} = dzz
-dealL {iz = _ - _} = ds' dealL
-deal+L : forall {K}{iz jz kz}(lz : Bwd K) -> Deal iz jz kz -> Deal (iz ++ lz) jz (kz ++ lz)
-deal+L B0 de = de
-deal+L (lz - l) de = ds' (deal+L lz de)
-dealLR : forall {K}{iz jz : Bwd K} -> Deal iz jz (iz ++ jz)
-dealLR {jz = B0} = dealL
-dealLR {jz = _ - _} = d's dealLR
-
-leftCover : forall {K}(kz : Bwd K) -> Pairwise (\ a b -> Tt (a <+> b)) (oi {kz = kz}) oe
-leftCover B0 = <>
-leftCover (kz - k) = leftCover kz , <>
-left+Cover : forall {K iz jz kz}(th : iz <= kz)(ph : jz <= kz) ->
-  Pairwise (\ a b -> Tt (a <+> b)) th ph ->  (lz : Bwd K) ->
-  Pairwise (\ a b -> Tt (a <+> b)) (th <++= oi {kz = lz}) (ph <++= oe {kz = lz})
-left+Cover th ph c B0 = c
-left+Cover th ph c (lz - l) = left+Cover th ph c lz , <>
-
-dealLR' : forall {K}(iz jz : Bwd K) -> DealR iz jz (iz ++ jz)
-dealLR' iz B0 = oi , oe , leftCover iz
-dealLR' iz (jz - j) with dealLR' iz jz
-... | th , ph , c = th o' , ph os , c , <>
-
-morphWeak : forall {I}{D : I -> Desc I}{iz kz iz' kz'} -> Morph D iz kz -> iz' <= kz' -> Morph D (iz ++ iz') (kz ++ kz')
-morphWeak {iz' = iz'}{kz' = kz'} (th <: de $> tz) ph = (th <++= ph) <: deal+L iz' de $> all (wTmK (oi <++= oe {kz = kz'})) tz
-
-morWk : forall {I}{D : I -> Desc I}{hz iz kz iz' kz'} ->
-        (Sg (MorphR D iz kz) \ m -> write m <= hz) -> iz' <= kz' -> (Sg (MorphR D (iz ++ iz') (kz ++ kz')) \ m -> write m <= hz)
-morWk (mor th (thl , thr , c) (sz ^ ps) , ze) ph =
-  mor (th <++= ph)
-      ((thl <++= oi {kz = src ph}) , (thr <++= oe {kz = src ph}) , left+Cover thl thr c (src ph))
-      (sz ^ (ps <++= oe {kz = trg ph}))
-  , ze
-
-act : forall {I}{D : I -> Desc I}{hz iz kz i} -> (m : Morph D iz kz) -> write m <= hz -> Hered hz -> TmR D i iz -> TmR D i / kz
-acts : forall {I}{D : I -> Desc I}{hz iz kz} T -> (m : Morph D iz kz) -> write m <= hz -> Hered hz -> [! T !! TmR D !]R iz -> [! T !! TmR D !]R / kz
-act m th h (# (only <[ ch ]> ts)) with morphRefine (lope ch) m | morphRefine (rope ch) m
-act m th h (# {jz = jz} (only <[ ch ]> ts)) | ml , thl | mr , thr with acts (SpD jz) mr (thr <&= th) h ts
-act m th h (# {jz} (only <[ ch ]> ts)) | leaven <: ds' dzz $> written , thl | mr , thr | ts' = map/ # (vaR leaven ,R ts')
-act m th (hered h) (# {jz} (only <[ ch ]> ts)) | leaven <: d's dzz $> (B0 - ((ps \\ t) ^ ph)) , thl | mr , thr | ts' =
-  act (ph <: dealLR $> (ps <?= spAll jz ts')) ps (h (thl <&= th)) t
-act {D = D}{i = i} m th h [ ts ] = map/ [_] (acts (D i) m th h ts)
-acts (RecD (jz => i)) m th h (ph \\ t) = jz \\R act (morphWeak m ph) th h t
-acts (SgD S T) m th h (s , t) = map/ (s ,_) (acts (T s) m th h t)
-acts OneD m th h <> = <>R
-acts (S *D T) m th h (s <[ ch ]> t) with morphRefine (lope ch) m | morphRefine (rope ch) m
-... | ml , thl | mr , thr = acts S ml (thl <&= th) h s ,R acts T mr (thr <&= th) h t
-
-actR : forall {I}{D : I -> Desc I}{hz iz kz i} -> (Sg (MorphR D iz kz) \ m -> write m <= hz) -> Hered hz -> TmRR D i iz -> TmRR D i / kz
-actsR : forall {I}{D : I -> Desc I}{hz iz kz} T -> (Sg (MorphR D iz kz) \ m -> write m <= hz) -> Hered hz -> [! T !! TmRR D !]RR iz -> [! T !! TmRR D !]RR / kz
-actR m h (# {jz} ((only ^ thl) <-> (tz ^ thr) ! _)) with morR thl m | actsR (SpD jz) (morR thr m) h tz
-actR m h (# {jz} ((only ^ thl) <-> tz ^ thr ! _)) | mor ph (dl os , dr os , _ , ()) sz , ze | tz'
-actR m h (# {jz} ((only ^ thl) <-> tz ^ thr ! _)) | mor ph (oz os , oz o' , <> , <>) _ , ze | tz' =
-  map/ # (vaR ph ,RR tz')
-actR m (hered h) (# {jz} ((only ^ thl) <-> tz ^ thr ! _)) | mor _ (oz o' , oz os , <> , <>) ((_ <-> (ph \\ s) ^ ps' ! _) ^ ps) , ze | tz' =
-  actR (mor (ps' <&= ps) (dealLR' (src ps') (src ph)) (ph <??= tz') , ph) (h ze) s
-actR m h (# {jz} ((only ^ thl) <-> tz ^ thr ! _)) | mor ph (dl o' , dr o' , _ , ()) sz , ze | tz'
-actR {D = D}{i = i} m h [ ts ] = map/ [_] (actsR (D i) m h ts)
-actsR (RecD (jz => i)) m h (ph \\ t) = jz \\R actR (morWk m ph) h t
-actsR (SgD S T) m h (s , t) = map/ (s ,_) (actsR (T s) m h t)
-actsR OneD m h <> = <>R
-actsR (S *D T) m h ((s ^ th) <-> (t ^ ph) ! _) = actsR S (morR th m) h s ,RR actsR T (morR ph m) h t
-
-co : forall {I}{D : I -> Desc I}{iz jz kz} -> MorphR D iz jz -> MorphR D jz kz -> MorphR D iz kz
-co (mor ph (thl , thr , c) (sz ^ ps)) m1 with morR ph (m1 , oi) | actsR (SpD (src thr)) (morR ps (m1 , oi)) (inherit _) sz
-... | mor ph1 (thl1 , thr1 , c1) (sz1 ^ ps1) , _ | sz0 ^ ps0 = mor ph1 (thl1 <&= thl , {!!} , {!!}) {!!}
-\end{spec}
-
+\begin{code}
+open HSub
+\end{code}
 %endif
+
+Before we see how to perform a substitution, let us consider how to \emph{weaken} one, as we
+shall certainly need to push under binders, where we have some |ph : iz <= jz| telling us
+which |iz| of the |jz| bound variables are used in the source term. Either way,
+bound variables are not substituted, so we add them to the passive
+side, at the same time keeping the active side below its bound.
+%format wkHSub = "\F{wkHSub}"
+%format bindPassive = "\F{bindPassive}"
+\begin{code}
+wkHSub :  forall {I}{D : I -> Desc I}{src trg bnd iz jz} ->
+          HSub D src trg bnd -> iz <= jz -> HSub D (src ++ iz) (trg ++ jz) bnd
+wkHSub {iz = iz}{jz = jz} h ph = record
+  { parti = bindPassive iz ; actBnd = actBnd h ; passTrg = passTrg h <++= ph
+  ; images = all (thin/ (oi <++= oe {kz = jz})) (images h) } where
+  bindPassive : forall iz -> Cover ff (passive h <++= oi {kz = iz}) (active h <++= oe {kz = iz})
+  bindPassive B0       = parti h
+  bindPassive (iz - _) = bindPassive iz cs'
+\end{code}
+As in a de Bruijn substitution, we must thin all the images, but the
+co-de-Bruijn representation avoids any need to traverse them --- just compose thinnings
+at the root.
+
+%format selPart = "\F{selPart}"
+%format selHSub = "\F{selHSub}"
+%format ps0 = "\V{\psi_0}"
+%format ps1 = "\V{\psi_1}"
+A second ancillary operation on |HSub| is to cut them down to just what is needed as
+variables are expelled from the source context by the thinnings stored in relevant pairs.
+We may select from an environment, but we must also refine the partition to cover just
+those source variables which remain, hence the |selPart| operation, which is a
+straightforward induction.
+%if False
+\begin{code}
+mutual
+\end{code}
+%endif
+\begin{code}
+  selHSub :  forall {I}{D : I -> Desc I}{src src' trg bnd}
+             (th : src <= src') -> HSub D src' trg bnd -> HSub D src trg bnd
+  selHSub ps (record { parti = c' ; actBnd = th' ; images = tz' ; passTrg = ph' }) =
+    let ! ! ! ! ph , th , c = selPart ps c' in record
+      { parti = c ; actBnd = th <&= th' ; images = th <?= tz' ; passTrg = ph <&= ph' }
+
+  selPart :  forall {K}{iz' jz' kz kz' : Bwd K}{th' : iz' <= kz'}{ph' : jz' <= kz'}
+             (ps : kz <= kz') -> Cover ff th' ph' ->
+             Sg _ \ iz -> Sg _ \ jz -> Sg (iz <= kz) \ th -> Sg (jz <= kz) \ ph ->
+             Sg (iz <= iz') \ ps0 -> Sg (jz <= jz') \ ps1 -> Cover ff th ph
+\end{code}
+%if False
+\begin{code}
+  selPart (ps o') (c' c's) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0    , ps1 o' , c
+  selPart (ps o') (c' cs') = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 o' , ps1 , c
+  selPart (ps o') (c' css) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 o' , ps1 o' , c
+  selPart (ps os) (c' c's) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 , ps1 os , c c's
+  selPart (ps os) (c' cs') = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 os , ps1 , c cs'
+  selPart (ps os) (_css {both = ()} _)
+  selPart oz czz = ! ! ! ! oz , oz , czz
+\end{code}
+%endif
+
+%format allLeft = "\F{allLeft}"
+%if False
+\begin{code}
+allLeft : forall {K}{iz kz : Bwd K}{ov}{th : iz <= kz}{ph : B0 <= kz} -> Cover ov th ph -> iz == kz
+allLeft (c cs') rewrite allLeft c = refl
+allLeft czz = refl
+\end{code}
+%endif
+
+%format hSub = "\F{hSub}"
+%format hSubs = "\F{hSubs}"
+%format hSubs/ = "\F{hSubs}_{\F{\slash}}"
+%format hered = "\F{hered}"
+%if False
+\begin{code}
+hSub    : forall {I D src trg bnd}{i : I} ->
+  HSub D src trg bnd -> TmR D i src              -> TmR D i / trg
+hSubs   : forall {I D src trg bnd}(S : Desc I) ->
+  HSub D src trg bnd -> [! S !! TmR D !]R src    -> [! S !! TmR D !]R / trg
+hSubs/  : forall {I D src trg bnd}(S : Desc I) ->
+  HSub D src trg bnd -> [! S !! TmR D !]R / src  -> [! S !! TmR D !]R / trg
+hered   : forall {I D jz trg bnd}{i : I} ->
+  (jz !- TmR D i) / trg -> B0 - (jz => i) <= bnd -> [! SpD jz !! TmR D !]R / trg -> TmR D i / trg
+\end{code}
+%endif
+
+The definition of hereditary substitution is a mutual recursion, terminating because the
+active scope is always decreasing: |hSub| is the main operation on terms; |hSubs| and |hSubs/|
+proceed structurally, in accordance with a syntax description; |hered| invokes |hSub| hereditarily.
+\begin{spec}
+hSub    :                  HSub D src trg bnd -> TmR D i src              -> TmR D i / trg
+hSubs   : (S : Desc I) ->  HSub D src trg bnd -> [! S !! TmR D !]R src    -> [! S !! TmR D !]R / trg
+hSubs/  : (S : Desc I) ->  HSub D src trg bnd -> [! S !! TmR D !]R / src  -> [! S !! TmR D !]R / trg
+hered   : (jz !- TmR D i) / trg -> B0 - (jz => i) <= bnd -> [! SpD jz !! TmR D !]R / trg -> TmR D i / trg
+\end{spec}
+When |hSub| finds a variable, |selHSub| will reduce the |parti| to a single choice:
+if the variable is passive, we embed it in the target context and reattach it to its substituted spine;
+if active, we must proceed |hered|itarily.
+\begin{code}
+hSub {D = D}{i = i} h [ ts ] = map/ [_] (hSubs (D i) h ts)
+hSub h (# {jz} (pair (only ^ th) ts _)) with selHSub th h | hSubs/ (SpD jz) h ts
+... | record { parti = _css {both = ()} _ }                         | ts'
+... | record { parti = czz cs' ; passTrg = ph }                     | ts' = map/ # (vaR ph ,R ts')
+... | record { parti = czz c's ; actBnd = th' ; images = B0 - im }  | ts' = hered im th' ts'
+\end{code}
+
+%format part = "\F{part}"
+%format spAll = "\F{spAll}"
+To substitute a variable |hered|itarily, find it in the bounding scope, for the scope of its
+kind becomes the new and \emph{structurally smaller} bound. Helper function |part| computes the partition
+with free variables passive and bound variables active, while |spAll| converts the spine of actual
+parameters into the environment of images for the bound variables.
+\begin{code}
+hered                     im                (th' o') ts' = hered im th' ts'
+hered {D = D}{trg = trg}  ((ph \\ t) ^ ps)  (th' os) ts' = let ! ! c = part _ _ in 
+  hSub (record { parti = c ; actBnd = ph ; images = ph <?= spAll ts' ; passTrg = ps }) t where
+    spAll  :  forall {kz} -> [! SpD kz !! TmR D !]R / trg -> All _ kz
+    part   :  forall kz iz -> Sg (kz <= (kz ++ iz)) \ th -> Sg (iz <= (kz ++ iz)) \ th' -> Cover ff th th'
+\end{code}
+%if False
+\begin{code}
+    spAll {B0}              _                    = B0
+    spAll {kz - (jz => i)}  (pair ts' t _ ^ ps)  = spAll (thin/ ps ts') - thin/ ps t
+    part kz (iz - _) = let ! ! c = part kz iz in ! ! c c's
+    part (kz - _) B0 = let ! ! c = part kz B0 in ! ! c cs'
+    part B0 B0 = ! ! czz
+\end{code}
+%endif
+
+In the structural part of the algorithm, we may exploit our richer usage information
+to stop as soon as the active variables have all left scope,
+thinning the remaining passive variables with no further traversal. The lemma |allLeft| shows
+that if the right of a partition is empty, the left must be full.
+\begin{code}
+hSubs (RecD k)   h (ph \\ t)     = scope k \\R hSub (wkHSub h ph) t
+hSubs (SgD S T)  h (s , ts)      = map/ (s ,_) (hSubs (T s) h ts)
+hSubs OneD       h <>            = <>R
+hSubs (S *D T)   h (pair s t _)  = hSubs/ S h s ,R hSubs/ T h t 
+hSubs/ S h' (ts ^ th) with selHSub th h'
+hSubs/ S h' (ts ^ th) | record { parti = c ; images = B0 ; passTrg = ph } rewrite allLeft c = ts ^ ph
+hSubs/ S h' (ts ^ th) | h = hSubs S h ts
+\end{code}
 
 \bibliographystyle{eptcs}
 \bibliography{EGTBS}
