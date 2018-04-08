@@ -13,7 +13,7 @@
 \newcommand{\F}[1]{\green{\ensuremath{\mathsf{#1}}}}
 \newcommand{\V}[1]{\purple{\ensuremath{\mathit{#1}}}}
 
-\newcommand{\OPE}{\Updelta}
+\newcommand{\OPE}[1]{\Updelta_+^{#1}}
 
 \title{Everybody's Got To Be Somewhere}
 \author{
@@ -238,7 +238,7 @@ infixr 6 _==_
 %endif
 
 
-\section{$\OPE_{|K|}$: The (Simplicial) Category of Order-Preserving Embeddings}
+\section{$\OPE{|K|}$: The (Semi-Simplicial) Category of Order-Preserving Embeddings}
 
 No category theorist would mistake me for one of their own. However, the key technology
 in this paper can be helpfully conceptualised categorically. Category theory is just the
@@ -254,12 +254,12 @@ $\mathbb{C}(S,T)$ for its morphisms with given source and target,
 $S,T\in||\mathbb{C}||$.
 
 The rest will follow, but let
-us fix these notions for our example category, $\OPE_{|K|}$, of
+us fix these notions for our example category, $\OPE{|K|}$, of
 \emph{order-preserving embeddings} between variable scopes, which I
 learned about from Altenkirch, Hofmann and Streicher~\cite{DBLP:conf/ctcs/AltenkirchHS95}.
 Objects are \emph{scopes}, given as backward (or `snoc') lists of the \emph{kinds}, |K|, of
 variables. (I habitually suppress the |K| and just write
-$\OPE$ for the category.)
+$\OPE{}$ for the category.)
 Backward lists respect the tradition of writing contexts
 left of judgements in rules and extending them on the
 right. However, I write `scope' rather than `context' as
@@ -301,7 +301,7 @@ data _<=_ : Bwd K -> Bwd K -> Set where
   oz   :                     B0      <=       B0
 \end{spec}}
 
-The morphisms, |iz <= jz|, of $\OPE$ give an embedding from a source
+The morphisms, |iz <= jz|, of $\OPE{}$ give an embedding from a source
 to a target scope. Colloquially, we may call them
 `thinnings', as they dilute the variables of the source scope with
 more.  Dually, we may see such a morphism as
@@ -309,8 +309,8 @@ expelling variables from the target scope, leaving a particular
 selection as the source.  I write the step constructors postfix,
 so thinnings (like scopes) grow on the right. When |K = One|,
 |Bwd K| represents natural numbers and |<=| generates Pascal's
-Triangle; if, further, the empty scope is excluded, we obtain
-the \emph{simplex} category, beloved of topologists.
+Triangle; excluding the empty scope and allowing \emph{degenerate}
+(non-injective) maps yields the \emph{simplex} category, beloved of topologists.
 
 %if False
 \begin{code}
@@ -327,7 +327,7 @@ infixl 8 _o' _os
 Now, where I give myself away as a type theorist is that I do not
 consider the notion of `morphism' to make sense without prior source and
 target objects. The type |iz <= jz| (which is a little more mnemonic than
-$\OPE(|iz|,|jz|)$) is the type of `thinnings from |iz| to
+$\OPE{}(|iz|,|jz|)$) is the type of `thinnings from |iz| to
 |jz|': there is no type of `thinnings' \emph{per se}.
 %if False
 By making types explicit about source
@@ -503,7 +503,7 @@ antisym (th o' o') (ph o') | refl , () , c
 %endif
 
 
-\paragraph{Example: de Bruijn Syntax via $\OPE_{|One|}$.}~
+\paragraph{Example: de Bruijn Syntax via $\OPE{|One|}$.}~
 %
 %format (Cix (k)) = "\F{\overline{\black{" k "}}}"
 %format Cix_ = "\F{\overline{\black{\_}}}"
@@ -712,13 +712,13 @@ ps ->/ ph = Sg _ \ th -> Tri th ph ps
 %endif
 
 %format triU = "\F{triU}"
-A useful $\OPE$-specific property is that morphisms in $\OPE/|kz|$ are \emph{unique}.
+A useful $\OPE{}$-specific property is that morphisms in $\OPE{}/|kz|$ are \emph{unique}.
 It is easy to state this property in terms of triangles with common edges,
 |triU : Tri th ph ps -> Tri th' ph ps -> th == th'|,
 and then
 prove it by induction on the triangles, not edges.
 It is thus cheap to obtain \emph{universal properties} in the slices of
-$\OPE$, asserting the existence of unique morphisms: uniqueness comes for free!
+$\OPE{}$, asserting the existence of unique morphisms: uniqueness comes for free!
 %if False
 \begin{code}
 triU :  forall {K}{iz jz kz : Bwd K}{th th' : iz <= jz}{ph : jz <= kz}{ps : iz <= kz} ->
@@ -752,7 +752,7 @@ Note that there is an identity functor $\Id$ (whose actions on objects
 and morphisms are the identity) from $\mathbb{C}$ to itself
 and that functors compose (componentwise).
 
-E.g., every |k : K| induces a functor (\emph{weakening}) from $\OPE$ to itself
+E.g., every |k : K| induces a functor (\emph{weakening}) from $\OPE{}$ to itself
 by scope extension, |(_ - k)| on objects and |os| on
 morphisms. The very definitions of |oi| and |<&=| show that |os|
 preserves |oi| and |<&=|.
@@ -766,7 +766,7 @@ categories. Let |Set|'s objects be types in
 Agda's |Set| universe and $|Set|(S, T)$ exactly $S\to T$, with the usual identity and
 composition. Morphism equality is \emph{pointwise}.
 Exercises: make |Bwd : Set -> Set| a functor;
-check $(|LamTm|,|^L|)$ is a functor from $\OPE$ to |Set|.
+check $(|LamTm|,|^L|)$ is a functor from $\OPE{}$ to |Set|.
 
 %format -:> = "\mathrel{\dot{\to}}"
 %format _-:>_ = _ -:> _
@@ -843,14 +843,14 @@ Note that a functor from $\op{\mathbb{C}}$ to $\mathbb{D}$ is sometimes
 called a \emph{contravariant functor} from $\mathbb{C}$ to $\mathbb{D}$.
 %Moreover, a functor from $\op{\mathbb{C}}$ to |Set| is sometimes called a
 %\emph{presheaf} on $\mathbb{C}$. That is, |<?=| makes |All P| a presheaf on
-%$\OPE$.
+%$\OPE{}$.
 
 \noindent\parbox{3.5in}{\par
-E.g., $\op{\OPE}(|jz|,|iz|) = |iz <= jz|$ views thinnings as
+E.g., $\op{\OPE{}}(|jz|,|iz|) = |iz <= jz|$ views thinnings as
 \emph{selections} of just |iz| from the |jz| on offer.
 As shown, right, an environment for all the |jz| whittles down to
 just the |iz|, making
-|All P| a \emph{presheaf} on $\OPE$ --- a \emph{functor} from $\op\OPE$ to |Set|.}
+|All P| a \emph{presheaf} on $\OPE{}$ --- a \emph{functor} from $\op{\OPE{}}$ to |Set|.}
 %format <?= = "\F{\le\!?}"
 %format _<?=_ = _ <?= _
 %format <?=_ = <?= _
@@ -949,7 +949,7 @@ open _/_
 \end{code}
 %endif
 
-In fact, the categorical structure of $\OPE$ makes |/| a \emph{monad}.
+In fact, the categorical structure of $\OPE{}$ makes |/| a \emph{monad}.
 Let us recall the definition.
 
 \paragraph{Monad.~} A functor $M$ from $\mathbb{C}$ to $\mathbb{C}$ gives
@@ -977,10 +977,10 @@ adjacent $M$ layers may be merged pairwise in any order.
 The categorical structure of thinnings makes |/| a monad. Here,
 `adding a layer' amounts to `wrapping with a
 thinning'. The proof obligations to make $(|/|,|unit/|,|mult/|)$ a monad are
-exactly those required to make $\OPE$ a category in the first place.
+exactly those required to make $\OPE{}$ a category in the first place.
 In particular, things-with-thinnings are easy to thin further, indeed,
 parametrically so. In other words, |(T /)| is uniformly a functor from
-$\OPE$ to |Set|.
+$\OPE{}$ to |Set|.
 \\ \hspace*{-0.2in}
 \parbox{1.5in}{
 \begin{spec}
@@ -1035,10 +1035,10 @@ by \emph{insisting} that a term's
 |thinning| \emph{must} be used in the |thing|. Everybody's got to be somewhere.
 
 
-\section{The Curious Case of the Coproduct in  Slices of $\OPE$}
+\section{The Curious Case of the Coproduct in  Slices of $\OPE{}$}
 
 The |/| construction makes crucial use of objects
-in the slice category $\OPE/|scope|$, which exhibit useful additional
+in the slice category $\OPE{}/|scope|$, which exhibit useful additional
 structure: they are \emph{bit vectors},
 with one bit per variable telling whether it has been selected.
 Bit vectors inherit Boolean structure, via the
@@ -1052,11 +1052,11 @@ $0$, if there is a unique morphism in $\mathbb{C}(0,X)$ for every $X$.
 %format oe/ = oe "\F{\slash}"
 The \emph{empty type} is famed for this r\^ole for
 types-and-functions: empty case analysis gives
-the vacuously unique morphism. In $\OPE$, the
+the vacuously unique morphism. In $\OPE{}$, the
 empty \emph{scope} plays this r\^ole, with the
 `constant 0' bit vector as unique morphism.
 By return of post, we get $(|B0|,|oe|)$ as the initial object in the
-slice category $\OPE/|kz|$. Hence, we can make \emph{constants} with empty support,
+slice category $\OPE{}/|kz|$. Hence, we can make \emph{constants} with empty support,
 i.e., noting that no variable is ($\cdot_R$ for) \emph{relevant}.
 %
 \vspace*{ -0.2in} \\
@@ -1118,7 +1118,7 @@ data OneR {K} : (Cix K) where  <> : OneR B0
 %format _,R_ = _ ,R _
 We should expect the constant to be the trivial case of some notion
 of \emph{relevant pairing}, induced by \emph{coproducts} in the slice category.
-If we have two objects in $\OPE/|kz|$ representing two subscopes, there should
+If we have two objects in $\OPE{}/|kz|$ representing two subscopes, there should
 be a smallest subscope which includes both: pairwise disjunction
 of bit vectors.
 
@@ -1134,10 +1134,10 @@ and $h$ the \emph{case analysis} whose branches are $f$ and $g$.
 However, we are not working in |Set|, but in a slice category.
 Any category theorist will tell you that slice categories $\mathbb{C}/I$
 inherit \emph{colimit} structure (characterized by universal out-arrows)
-from $\mathbb{C}$, as indeed we just saw with the initial object. If $\OPE$
+from $\mathbb{C}$, as indeed we just saw with the initial object. If $\OPE{}$
 has coproducts, too, we are done!
 
-Curiously, though, $\OPE$ does \emph{not} have coproducts. Taking |K = One|,
+Curiously, though, $\OPE{}$ does \emph{not} have coproducts. Taking |K = One|,
 let us seek the coproduct of two singletons, $S = T = |B0 - <>|$.
 Construct one diagram by taking $U = |B0 - <>|$ and $f = g = |oi|$,
 ensuring that our only candidate for $S + T$ is again the
@@ -1148,7 +1148,7 @@ allowing $f' = |oz os o'|$ and $g' = |oz o' os|$. No $h'$
 post-composes $l$ and $r$ (both |oi|, making $h'$ itself)
 to yield $f'$ and $g'$ respectively.
 
-Fortunately, we get what we need: $\OPE$ may not have coproducts, but its
+Fortunately, we get what we need: $\OPE{}$ may not have coproducts, but its
 \emph{slices} do.
 %It is not the case that colimit structure in $\mathbb{C}/I$
 %arises \emph{only} via inheritance from $\mathbb{C}$.
@@ -1300,7 +1300,7 @@ _,R_ : forall {K}{S T : (Cix K)}{kz} -> S / kz -> T / kz -> (S *R T) / kz
 To talk about binding, we need scope extension.
 We have seen single `snoc', but binding is simultaneous in general.
 Concatenation induces monoidal structure on
-objects of $\OPE$, extending to morphisms.
+objects of $\OPE{}$, extending to morphisms.
 %format ++ = "\F{+\!\!+}"
 %format _++_ = _ ++ _
 %format <++= = ++ "_{" <= "}"
