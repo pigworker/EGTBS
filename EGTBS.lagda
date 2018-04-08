@@ -1746,29 +1746,33 @@ Let us develop the appropriate notion of substitution for our metasyntax, \emph{
 in the sense of Watkins et al.~\cite{DBLP:conf/types/WatkinsCPW03}. Substituting a higher-kinded
 variable requires us further to substitute its parameters.
 
-There is some subtlety to the construction of the record type |HSub| of hereditary substitutions.
+The construction of the type |HSub| of hereditary substitutions is subtle.
 We may |parti|tion the source scope into |passive| variables, which embed into the target,
-and |active| variables for which we have an environment |images| appropriate to their kinds.
-The |HSub| type is indexed by a third scope which bounds the active kinds, by way of
-ensuring \emph{termination}.
+and |active| variables with an environment of |images| suited to their kinds.
+The |HSub| type is indexed by a third scope, bounding the active kinds, by way of
+ensuring \emph{termination} --- the oldest trick in my book~\cite{DBLP:journals/jfp/McBride03}.
 \begin{code}
 record HSub {I} D (src trg bnd : Bwd (Kind I)) : Set where
-  field  pass act   : Bwd (Kind I)             ; passive  : pass  <= src  ; active  : act <= src
-         parti  : Cover ff passive active  ; passTrg  : pass  <= trg  ; actBnd  : act <= bnd
+  field  pass act   : Bwd (Kind I);           passive  : pass  <= src;  active  : act <= src
+         parti  : Cover ff passive active  ;  passTrg  : pass  <= trg;  actBnd  : act <= bnd
          images     : All (\ k -> (scope k !- TmR D (sort k)) / trg) act
 \end{code}
 
+%format ; = ";"
 %if False
 \begin{code}
 open HSub
 \end{code}
 %endif
 
-Before we see how to perform a substitution, let us consider how to \emph{weaken} one, as we
-shall certainly need to push under binders, where we have some |ph : iz <= jz| telling us
-which |iz| of the |jz| bound variables are used in the source term. Either way,
-bound variables are not substituted, so we add them to the passive
-side, at the same time keeping the active side below its bound.
+Before we see how to perform a substitution, let us think how to \emph{weaken} one: we
+certainly push under binders, where some |ph : iz <= jz| says
+which |iz| of the |jz| bound variables occur in the source term. Bound variables are not
+substituted, so add them to the passive
+side, keeping the active side bounded.
+As with de Bruijn shifts, we must thin the images:
+co-de-Bruijn representation lets us thin them
+at the \emph{root}!
 %format wkHSub = "\F{wkHSub}"
 %format bindPassive = "\F{bindPassive}"
 \begin{spec}
@@ -1778,18 +1782,15 @@ wkHSub {iz = iz}{jz = jz} h ph = record
   ; images = all (thin/ (oi <++= oe {kz = jz})) (images h) } where
   bindPassive : forall iz -> Cover ff (passive h <++= oi {kz = iz}) (active h <++= oe {kz = iz})
 \end{spec}
-As in a de Bruijn substitution, we must thin all the images, but the
-co-de-Bruijn representation avoids any need to traverse them --- just compose thinnings
-at the root.
 
 %format selPart = "\F{selPart}"
 %format selHSub = "\F{selHSub}"
 %format ps0 = "\V{\psi_0}"
 %format ps1 = "\V{\psi_1}"
-A second ancillary operation on |HSub| is to cut them down to just what is needed as
-variables are expelled from the source context by the thinnings stored in relevant pairs.
+A second handy function on |HSub|s whittles them down as
+variables are expelled from scope by thinnings in relevant pairs.
 We may select from an environment, but we must also refine the partition to cover just
-those source variables which remain, hence the |selPart| operation, which is a
+those source variables which remain, hence the |selPart| operation, a
 straightforward induction.
 %if False
 \begin{code}
@@ -1921,6 +1922,66 @@ hSubs/ S h' (ts ^ th) with selHSub th h'
 hSubs/ S h' (ts ^ th) | record { parti = c ; images = B0 ; passTrg = ph } rewrite allLeft c = ts ^ ph
 hSubs/ S h' (ts ^ th) | h = hSubs S h ts
 \end{code}
+
+
+\section{Discussion}
+
+We have a universe of syntaxes with metavariables and binding, where the |Desc|ription of a
+syntax is interpreted as the co-de-Bruijn terms, ensuring intrinsically that unused variables are
+discarded not at the \emph{latest} opportunity (as in de Bruijn terms), nor at an \emph{arbitrary}
+opportunity (as in one of Bird and Paterson's variants~\cite{bird.paterson:debruijn.nested}, or
+with Hendriks and van Oostrom's `adbmal' operator~\cite{DBLP:conf/cade/HendriksO03}, both of
+which reduce the labour of shifting at the cost of nontrivial $\alpha$-equivalence), but at the \emph{earliest}
+opportunity. Hereditary substitution exploits usage information to stop when there is nothing to substitute,
+shifts without traversal, and is, moreover, structurally recursive on the \emph{active scope}.
+
+Recalling Atkey's Battlestar-Galactica-inspired quip about de Bruijn indices being a `Cylon detector',
+co-de-Bruijn representation is even less suited to human comprehension, but its informative precision
+makes it all the more useful for machines. Dependency checking is direct, so syntactic forms like
+vacuous functions or $\eta$-redexes are easy to spot.
+
+Co-de-Bruijn representation could lead to more efficient implementations of normalization and of
+metavariable instantiation. The technique may be readily combined with representing terms as trees
+whose top-level leaves are variable uses and top-level nodes are just those
+(now easily detected) where paths to variables split: edges in the tree are \emph{closed}
+one-hole contexts, jumped over in constant time~\cite{conor:tube}.
+
+I see two high-level directions emerging from this work. Firstly, the generic treatment of
+syntax with \emph{meta}variables opens the way to the generic treatment of \emph{metatheory}.
+Even without moving from scope-safe to type-safe term representations, we can consider
+the inductive relations we use to define notions such as reduction and type synthesis
+as generated by descriptions for a universe, then seek to capture good properties
+(e.g., stability under substitution, leading to type soundness) by construction. Co-de-Bruijn
+representations make it easy to capture properties such as variable non-occurrence within the
+syntax of the formulae used in rules, and might also serve as the target term representation
+for algorithms extracted generically from the rules.
+
+Secondly, more broadly, this work gives further evidence for a way of programming with strong
+invariants and redundant but convenient information caches without fear of bugs arising
+from inconsistency. We should put the programmer in charge! Dependent types should let
+us take control of data representations and optimise them to support key operations,
+but with the invariants clearly expressed in code and actively supporting program synthesis.
+
+Only a fool would attempt to enforce the co-de-Bruijn invariants without support
+from a typechecker, so naturally I have done so: using Haskell's {\tt
+Integer} for bit vectors (making {\tt -1} the identity of the unscoped
+thinning \emph{monoid}), I implemented a dependent type system, just for
+fun. It was Hell's delight, even with the Agda version to follow. I was
+sixteen again.
+
+\paragraph{Acknowledgements.~} EPSRC project
+EP/M016951/1 \emph{Homotopy Type Theory: Programming and Verification} funded
+this work. My Mathematically Structured
+Programming colleagues at Strathclyde made me get these ideas in shape:
+Fredrik Nordvall Forsberg offered particularly useful advice about what
+to omit. Philippa Cowderoy's \emph{information effects}
+increased my sensitivity to the signposting of discards and duplications.
+An EU TYPES Short Term Scientific Mission brought Andrea Vezzosi
+to Strathclyde, provoking ideas and action for further work.
+Invitations to present at \emph{Trends in Functional Programming 2017}
+(Canterbury) and to my old Nottingham friends (notably Thorsten Altenkirch) helped
+me find the words. James McKinna and Randy Pollack remain an inspiration.
+And thanks, tweeps!
 
 \bibliographystyle{eptcs}
 \bibliography{EGTBS}
