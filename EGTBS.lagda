@@ -13,7 +13,7 @@
 \newcommand{\F}[1]{\green{\ensuremath{\mathsf{#1}}}}
 \newcommand{\V}[1]{\purple{\ensuremath{\mathit{#1}}}}
 
-\newcommand{\OPE}{\textbf{OPE}}
+\newcommand{\OPE}{\Updelta}
 
 \title{Everybody's Got To Be Somewhere}
 \author{
@@ -39,6 +39,9 @@
 %format forall = "\forall"
 %format . = "."
 
+%format combK = "\F{\mathbb{K}}"
+%format combS = "\F{\mathbb{S}}"
+
 %if False
 \begin{code}
 module EGTBS where
@@ -49,17 +52,122 @@ module EGTBS where
 \maketitle
 
 \begin{abstract}
-This literate Agda paper gives a nameless \emph{co}-de-Bruijn representation of
-generic (meta)syntax with binding. It owes much to the work of Sato et
-al.~\cite{spss:lambda.maps} on representation of variable
-binding by mapping variable use sites.  The key to any nameless
-representation of syntax is how it indicates the variables we choose
-to use and thus, implicitly those we neglect. The business of
-\emph{selecting} is what we shall revisit with care in the sequel.
-The definition leads to a new construction of hereditary substitution.
+The key to any nameless representation of syntax is how it indicates the variables we choose
+to use and thus, implicitly, those we discard. Standard de Bruijn representations delay 
+discarding \emph{maximally} till the \emph{leaves} of terms where
+one is chosen from the variables in scope at the expense of the rest. Consequently, introducing new but unused
+variables requires term traversal. This paper introduces a
+nameless `\emph{co}-de-Bruijn' representation which makes the opposite canonical choice, delaying
+discarding \emph{minimally}, as near as possible to the \emph{root}.  It is literate Agda: dependent types
+make it a practical joy to express and be driven by strong intrinsic invariants
+which ensure that scope is aggressively whittled down to just the \emph{support} of each subterm, in which every
+remaining variable occurs somewhere. The construction is generic, delivering a
+\emph{universe} of syntaxes with higher-order \emph{meta}variables, for which the appropriate notion of
+substitution is \emph{hereditary}. The implementation of simultaneous substitution exploits tight scope control
+to avoid busywork and shift terms without traversal. Surprisingly, it is
+also intrinsically terminating, by structural recursion alone.
 \end{abstract}
 
-\section{Basic Equipment}
+
+%\section{Introduction}
+
+When I was sixteen and too clever by half, I wrote a text editor which cached
+a plethora of useful but redundant pointers into the buffer, just to shave a handful
+of nanoseconds off redisplay. Accurately updating these pointers at each
+keystroke was a challenge which taught me the hard way about the value of simplicity.
+Now, I am a dependently typed programmer. I do not keep invariants: invariants keep me.
+
+This paper is about scope invariants in nameless representations of syntax. One motivation
+for such is eliminating redundant name choice to make $\alpha$-equivalence trivial. Classic de Bruijn
+syntaxes~\cite{deBruijn:dummies} replace name by number:
+variable uses count either out to the binding (\emph{indices}), or
+in from root to binding (\emph{levels}). Uses are found at the
+leaves of syntax trees, so any operation which modifies the sequence of variables
+in scope requires traversal. E.g., consider this
+$\beta$-reduction (under $\lambda x$) in untyped $\lambda$-calculus.
+\newcommand{\fb}[1]{\framebox{\ensuremath{#1}}}
+\[\begin{array}{rrcl}
+\mbox{name}    & \lambda x.\: (\lambda y.\:\, y\:x\:(\lambda z.\: z\:(y\:z)))\:\underline{(x\:(\lambda v.\:v))}
+               & \leadsto_\beta
+               & \lambda x.\: \underline{(x\:(\lambda v.\:v))}\:x\:(\lambda z.\: z\:(\underline{(x\:(\lambda v.\:v))}\:z)\\
+\mbox{index}   & \lambda \;\,.\: (\lambda \;\,.\: 0\:1\:(\lambda \;.\: 0\:(1\:0)))\:\underline{(0\:(\lambda \;.\:0))}
+               & \leadsto_\beta
+               & \lambda \;\,.\: \underline{(0\:(\lambda \;.\:0))}\:0\:(\lambda \;\,.\: 0\:(\underline{(1\:(\lambda \;\,.\:0))}\:0)\\
+\mbox{level}   & \lambda \;\,.\: (\lambda \;\,.\: 1\:0\:(\lambda \;.\: 2\:(1\:2)))\:\underline{(0\:(\lambda \;.\:1))}
+               & \leadsto_\beta
+               & \lambda \;\,.\: \underline{(0\:(\lambda \;.\:1))}\:0\:(\lambda \;\,.\: 1\:(\underline{(0\:(\lambda \;\,.\:2))}\:1)\\
+\end{array}\]
+Underlining shows the movement of the substituted term. In the \emph{index} representation,
+the free $x$ must be shifted when it goes under the $\lambda z$. With \emph{levels},
+the free $x$ stays $0$, but the bound $v$ must be shifted under $\lambda z$,
+and the substitution context must be shifted to account for the eliminated $\lambda y$.
+Shift happens.
+
+The objective of this paper is not to eliminate shifts altogether, but to ensure that they
+do not require traversal. The approach is to track exactly which variables are \emph{relevant}
+at all nodes in the tree and aggressively expel those unused in any given subtree. As we do
+so, we need and obtain much richer accountancy of variable usage, with much more intricate
+invariants. Category theory guides the design of these invariants and Agda's dependent
+types~\cite{DBLP:conf/afp/Norell08} drive their correct implementation.
+
+\newcommand\bs{\char`\\}
+My explorations follow Sato, Pollack, Schwichtenberg and
+Sakurai, whose $\lambda$-terms make
+binding sites carry \emph{maps} of use sites~\cite{spss:lambda.maps}. E.g.,
+the |combK| and |combS| combinators become (respectively)
+\[\begin{array}{r@@{\qquad}r@@{\:}r@@{\:}l@@{\qquad}r@@{\:}r@@{\:}r@@{\:}c@@{\:}c}
+\mbox{names} & \lambda c.&\lambda e.&c & \lambda f.&\lambda s.&\lambda e.&(f\:e)&(s\:e)\\
+\mbox{maps} & \texttt{1\bs}&\texttt{0\bs}&\square & \texttt{((10) (00))\bs}&\texttt{((00) (10))\bs}&\texttt{((01) (01))\bs}&(\square\:\square)&(\square\:\square)\\
+\end{array}\]
+where each abstraction shows with $\texttt{1}$s where in the subsequent tree of applications
+its variable occurs: leaves, $\square$, are relieved of choice.
+Of course, the tree under each binder determines which maps are well formed
+in a highly nonlocal way: these invariants are formalised \emph{extrinsically} both in
+Isabelle/HOL and in Minlog, over a context-free datatype enforcing neither scope nor shape.
+
+In this paper, we shall obtain an \emph{intrinsically} valid
+representation, where the map information is localized. Binding sites
+tell only if the variable is used; the crucial choice points where a
+term comprises more than one subterm say which variables go where. Not
+all are used in all subterms, but (as Eccles says to Seagoon) \emph{everybody's got to be somewhere}~\cite{eccles}:
+variables used nowhere have been discarded already.
+This property is delivered by a coproduct construction in the slices of the category
+of order-preserving embeddings, but fear not: we shall revisit all of the category
+theory required to develop the definition, especially as it strays beyond the
+familiar (e.g., to Haskellers) territory of types-and-functions.
+
+Intrinsically well scoped de Bruijn terms date back to Bellegarde and
+Hook~\cite{bellegarde.hook:substitution.monad}, using {\tt option} types to grow
+a type of free variables, but hampered by lack of
+polymorphic recursion in ML. Substitution (i.e., \emph{monadic} structure)
+was developed for untyped terms by Bird and Paterson~\cite{bird.paterson:debruijn.nested}
+and for simple types by Altenkirch and Reus~\cite{altenkirch.reus:monads.lambda}, both
+dependent either on a \emph{prior} implementation of renumbering shifts (i.e., functorial
+structure) or a non-structural recursion. My thesis~\cite{DBLP:phd/ethos/McBride00} follows McKinna
+and Goguen~\cite{goguenmckinna} in restoring a single
+structural operation abstracting `action' on variables, instantiated to
+renumbering then to substitution, an approach subsequently adopted by Benton, Kennedy and
+Hur~\cite{DBLP:journals/jar/BentonHKM12} and generalised to semantic actions by Allais et al.~\cite{DBLP:conf/cpp/Allais0MM17}.
+Here, we go directly to substitution: \emph{shifts need no traversal}.
+
+I present not only $\lambda$-calculus but a \emph{universe} of syntaxes inspired
+by Harper, Honsell and Plotkin's
+Logical Framework~\cite{DBLP:journals/jacm/HarperHP93}. I lift the \emph{sorts} of a syntax to higher
+\emph{kinds}, acquiring both binding (via subterms at higher kind) and
+\emph{meta}variables (at higher kind). However,
+substituting a higher-kinded variable demands substitution of its parameters
+\emph{hereditarily}~\cite{DBLP:conf/types/WatkinsCPW03} and \emph{simultaneously}. Thereby hangs a tale.
+Abel showed how \emph{sized types} justify this process's apparently non-structural
+recursion in MSFP 2006~\cite{DBLP:conf/mpc/000106}. As editor, I anonymised a discussion with a referee
+which yielded a structural recursion for hereditary substitution of a \emph{single} variable,
+instigating Keller and Altenkirch's formalization at MSFP
+2010~\cite{DBLP:conf/icfp/KellerA10}. Here, at last, simultaneous hereditary substitution
+becomes structurally recursive.
+
+
+
+
+\section{Basic Equipment in Agda}
 
 %format Set = "\D{Set}"
 %format Zero = "\D{Zero}"
@@ -130,13 +238,13 @@ infixr 6 _==_
 %endif
 
 
-\section{$\OPE_{|K|}$: The Category of Order-Preserving Embeddings}
+\section{$\OPE_{|K|}$: The (Simplicial) Category of Order-Preserving Embeddings}
 
 No category theorist would mistake me for one of their own. However, the key technology
-in this paper can be helpfully conceptualised categorically. Category theory is the
-study of compositionality for anything, not just sets-and-functions: here, we have an
-opportunity to develop categorical structure with an example apart from the usual
-functional programming apparatus, as emphasized particularly in the Haskell community. This strikes me as a good opportunity to revisit the basics.
+in this paper can be helpfully conceptualised categorically. Category theory is just the
+study of compositionality --- for everything, not just sets-and-functions. Here, we have an
+opportunity to develop categorical structure away from the usual apparatus for
+programming with functions. Let us therefore revisit the basics.
 
 \paragraph{Category (I): Objects and Morphisms.~} A \emph{category} is given by a class of \emph{objects} and a family
 of \emph{morphisms} (or \emph{arrows}) indexed by two objects: \emph{source} and
@@ -145,18 +253,18 @@ category, $||\mathbb{C}||$ for its objects, and
 $\mathbb{C}(S,T)$ for its morphisms with given source and target,
 $S,T\in||\mathbb{C}||$.
 
-The rest of the definition will follow shortly, but let
-us fix these notions for our example, the category, $\OPE_{|K|}$, of
-\emph{order-preserving embeddings} between variable scopes.
-The objects of $\OPE_{|K|}$ are \emph{scopes}, which we may represent
-concretely backward (or `snoc') lists giving the \emph{kinds}, |K|, of
-variables. (I shall habitually suppress the kind subscript and just write
+The rest will follow, but let
+us fix these notions for our example category, $\OPE_{|K|}$, of
+\emph{order-preserving embeddings} between variable scopes, which I
+learned about from Altenkirch, Hofmann and Streicher~\cite{DBLP:conf/ctcs/AltenkirchHS95}.
+Objects are \emph{scopes}, given as backward (or `snoc') lists of the \emph{kinds}, |K|, of
+variables. (I habitually suppress the |K| and just write
 $\OPE$ for the category.)
-I use backward lists, because it is traditional to write contexts to
-the left of judgements in typing rules and extend them on the
+Backward lists respect the tradition of writing contexts
+left of judgements in rules and extending them on the
 right. However, I write `scope' rather than `context' as
-we are characterizing at least which variables we may refer to, but perhaps
-not all the information one would find in a context.
+we track at least which variables we may refer to, but perhaps
+not all contextual data.
 %
 %format where = "\mathkw{where}"
 %format Bwd = "\D{Bwd}"
@@ -199,7 +307,10 @@ to a target scope. Colloquially, we may call them
 more.  Dually, we may see such a morphism as
 expelling variables from the target scope, leaving a particular
 selection as the source.  I write the step constructors postfix,
-so thinnings (like scopes) grow on the right.
+so thinnings (like scopes) grow on the right. When |K = One|,
+|Bwd K| represents natural numbers and |<=| generates Pascal's
+Triangle; if, further, the empty scope is excluded, we obtain
+the \emph{simplex} category, beloved of topologists.
 
 %if False
 \begin{code}
@@ -317,7 +428,7 @@ By way of example, let us plot specific uses of identity and composition.
 |k0|\;\bullet & -\!\!\!-\!\!\!-\!\!\!-\!\!\!-\!\!\!-\!\!\!-\!\!\!-\!\!\!- & \bullet\;|k0|\\
 \end{array}\]
 
-\paragraph{Category (III): Laws.~} to complete the definition of a
+\paragraph{Category (III): Laws.~} To complete the definition of a
 category, we must say which laws are satisfied by identity and
 composition. Composition \emph{absorbs} identity on the left and on
 the right. Moreover, composition is \emph{associative}, meaning that
@@ -392,8 +503,8 @@ antisym (th o' o') (ph o') | refl , () , c
 %endif
 
 
-\section{De Bruijn Syntax via $\OPE$}
-
+\paragraph{Example: de Bruijn Syntax via $\OPE_{|One|}$.}~
+%
 %format (Cix (k)) = "\F{\overline{\black{" k "}}}"
 %format Cix_ = "\F{\overline{\black{\_}}}"
 %format Set1 = Set "_1"
@@ -407,14 +518,9 @@ antisym (th o' o') (ph o') | refl , () , c
 %format lam = "\C{\uplambda}"
 %format ^L = "\F{\uparrow}"
 %format _^L_ = _ ^L _
-We often see numbers as de Bruijn indices for
-variables~\cite{deBruijn:dummies}, perhaps
-with some bound enforced by typing, as shown in principle by Bellegarde and
-Hook~\cite{bellegarde.hook:substitution.monad}, and in practice by
-Bird and Paterson~\cite{bird.paterson:debruijn.nested}, and (for simple types)
-by Altenkirch and Reus~\cite{altenkirch.reus:monads.lambda}. To grow the set
-of free variables under a binder, use option types or some
-`finite set' construction, often called `Fin'. We can use singleton embedding,
+De Bruijn indices are numbers~\cite{deBruijn:dummies}, perhaps
+with some bound enforced by type~\cite{bellegarde.hook:substitution.monad,bird.paterson:debruijn.nested,altenkirch.reus:monads.lambda}.
+We can use singleton thinning, |k <- kz = B0 - k <= kz|,
 %if False
 \begin{code}
 Cix_ : Set -> Set1
@@ -422,13 +528,12 @@ Cix K = Bwd K -> Set
 
 _<-_ : forall {K} -> K -> (Cix K)
 \end{code}
-%endif
 \begin{code}
 k <- kz = B0 - k <= kz
 \end{code}
-and then
-give the well scoped but untyped
-de Bruijn $\lambda$-terms, readily seen to admit thinning:
+%endif
+to give
+de Bruijn $\lambda$-terms, readily admitting thinning:
 \vspace*{ -0.2in} \\
 %\noindent
 \parbox[t]{3.5in}{
@@ -596,25 +701,24 @@ egTri = tzzz tsss t-'' t's' t-'' tsss
 \end{code}
 %endif
 
-We obtain a definition of morphisms in the slice as triangles.
+Morphisms in the slice can now be triangles:~ |ps ->/ ph = Sg _ \ th -> Tri th ph ps|.
 %if False
 \begin{code}
 _->/_ :  forall {K}{iz jz kz : Bwd K} -> (iz <= kz) -> (jz <= kz) -> Set
 \end{code}
-%endif
 \begin{code}
 ps ->/ ph = Sg _ \ th -> Tri th ph ps
 \end{code}
+%endif
 
-A useful property specific to thinnings is that morphisms in the slice category are \emph{unique}.
-It is straightforward to formulate this property in terms of triangles with edges in
-common, and then to work by induction on the triangles rather than their edges.
-As a result, it will be cheap to establish \emph{universal properties} in the slices of
-$\OPE$, asserting the existence of unique morphisms: uniqueness comes for free!
 %format triU = "\F{triU}"
-\begin{spec}
-triU : Tri th ph ps -> Tri th' ph ps -> th == th'
-\end{spec}
+A useful $\OPE$-specific property is that morphisms in $\OPE/|kz|$ are \emph{unique}.
+It is easy to state this property in terms of triangles with common edges,
+|triU : Tri th ph ps -> Tri th' ph ps -> th == th'|,
+and then
+prove it by induction on the triangles, not edges.
+It is thus cheap to obtain \emph{universal properties} in the slices of
+$\OPE$, asserting the existence of unique morphisms: uniqueness comes for free!
 %if False
 \begin{code}
 triU :  forall {K}{iz jz kz : Bwd K}{th th' : iz <= jz}{ph : jz <= kz}{ps : iz <= kz} ->
@@ -627,14 +731,13 @@ triU     tzzz        tzzz                      = refl
 %endif
 
 
-\section{Functors, a densely prevalent notion}
+\section{A Proliferation of Functors}
 
-Haskell makes considerable use of the type class \texttt{Functor}
-and its many subclasses, but this is only to scratch the surface: Haskell's functors
-are \emph{endo}functors, mapping the `category' of types-and-functions into itself.
-Once we adopt the appropriate level of
-generality, functoriality sprouts everywhere, and the same structures
-can be usefully functorial in many ways.
+Haskell makes merry with \texttt{class Functor}
+and its many subclasses: this scratches but the surface, giving only
+\emph{endo}functors from types-and-functions to types-and-functions.
+Once we adopt the general notion, functoriality sprouts everywhere, with
+the same structures usefully functorial in many ways.
 
 \newcommand{\Id}{\textbf{I}}
 \paragraph{Functor.~} A \emph{functor} is a mapping from a source
@@ -658,35 +761,31 @@ preserves |oi| and |<&=|.
 %most local scope --- from thinning --- adding new variables anywhere,
 %but this is far from universal.)
 
-Before we can have more examples, we shall need some more
-categories. Let |Set| be the category whose objects are Agda types in
-the |Set| universe and whose morphisms in $|Set|(S, T)$ are
-functions of type $S\to T$, with the usual identity and
-composition. Consider morphisms equal if they agree
-\emph{pointwise}.
-As an exercise, find the action on morphisms of
-show the |Set| to |Set| functor which is |Bwd| on objects,
-and check that $(|LamTm|,|^L|)$ gives a functor from $\OPE$ to |Set|.
+To see more examples, we need more
+categories. Let |Set|'s objects be types in
+Agda's |Set| universe and $|Set|(S, T)$ exactly $S\to T$, with the usual identity and
+composition. Morphism equality is \emph{pointwise}.
+Exercises: make |Bwd : Set -> Set| a functor;
+check $(|LamTm|,|^L|)$ is a functor from $\OPE$ to |Set|.
 
-Our work takes us in a different direction, profiting from
-the richness of dependent types: let us construct new categories by
-\emph{indexing}. If |I : Set|, we may then take |I -> Set| to be the
-category whose objects are \emph{families} of objects in |Set|,
-$|S|, |T| : |I -> Set|$ with morphisms being the corresponding (implicitly
-indexed) families of functions:
 %format -:> = "\mathrel{\dot{\to}}"
 %format _-:>_ = _ -:> _
+Let us plough a different furrow, rich in dependent types, constructing
+new categories by \emph{indexing}. If |I : Set|, we may then take |I -> Set| to be the
+category whose objects are \emph{families} of objects in |Set|,
+$|S|, |T| : |I -> Set|$ with morphisms (implicitly
+indexed) families of functions:~ |S -:> T = forall {i} -> S i -> T i|.
 %if False
 \begin{code}
 _-:>_ : {I : Set}(S T : I -> Set) -> Set
 \end{code}
-%endif
 \begin{code}
 S -:> T = forall {i} -> S i -> T i
 \end{code}
+%endif
+%
+Morphisms are equal if they map each index to pointwise equal functions.
 
-Consider
-morphisms equal if they map each index to pointwise equal functions.
 We may define a functor from |K -> Set| to |Bwd K -> Set| as follows:
 %
 %format All = "\D{All}"
@@ -746,22 +845,22 @@ called a \emph{contravariant functor} from $\mathbb{C}$ to $\mathbb{D}$.
 %\emph{presheaf} on $\mathbb{C}$. That is, |<?=| makes |All P| a presheaf on
 %$\OPE$.
 
-For example, $\op{\OPE}(|jz|,|iz|) = |iz <= jz|$ allows us to see the
-category of thinnings as the category of \emph{selections}, where we choose
-just |iz| from the available |jz|. If we have an environment for all of the
-|jz|, we should be able to whittle it down to an environment for just the
-|iz| by throwing away the values we no longer need. That is to say,
-|All P| is a \emph{functor} from $\op\OPE$ to |Set|, whose action on
-morphisms is
+\noindent\parbox{3.5in}{\par
+E.g., $\op{\OPE}(|jz|,|iz|) = |iz <= jz|$ views thinnings as
+\emph{selections} of just |iz| from the |jz| on offer.
+As shown, right, an environment for all the |jz| whittles down to
+just the |iz|, making
+|All P| a \emph{presheaf} on $\OPE$ --- a \emph{functor} from $\op\OPE$ to |Set|.}
 %format <?= = "\F{\le\!?}"
 %format _<?=_ = _ <?= _
 %format <?=_ = <?= _
+\parbox{2in}{\vspace*{ -0.1in}
 \begin{spec}
 _<?=_ : iz <= jz -> All P jz -> All P iz
 oz       <?= B0        = B0
 (th os)  <?= (pz - p)  = (th <?= pz) - p
 (th o')  <?= (pz - p)  = th <?= pz
-\end{spec}
+\end{spec}\vspace*{ -0.3in}}
 %if False
 \begin{code}
 _<?=_ : forall {K P}{jz iz : Bwd K}  -> iz <= jz -> All P jz -> All P iz
@@ -792,17 +891,15 @@ setting. We noted that |\ P -> All P kz| is a functor (with action |all|)
 from |K -> Set| to |Set|. Accordingly, if |th : iz <= jz| then
 |(th <?=_)|is a natural transformation from |\ P -> All P jz| to
 |\ P -> All P iz|, which is as much as to say that the definition of
-|<?=| is uniform in |P|, and hence that if |f : {k : K} -> P k -> Q k|, then
+|<?=| is uniform in |P|, and hence that if |f : forall {k} -> P k -> Q k|, then
 |all f (th <?= pz)| = |th <?= all f pz|.
 
 
-Dependently typed programming thus offers us a much richer seam of
-categorical structure than the basic types-and-functions familiar
-from Haskell (which demands some negotiation of totality even to
-achieve that much). For me, at any rate, this represents an opportunity
-to make sense of the categorical taxonomy by relating it to concrete
+Dependently typed programming thus offers us a richer seam of
+categorical structure than we see in Haskell. This presents an opportunity
+to make sense of the categorical taxonomy in terms of concrete
 programming examples, and at the same time, organising those programs
-and giving healthy indications for \emph{what to prove}.
+and indicating \emph{what to prove}.
 
 %if False
 A simple consequence is that only the identity has the same source
@@ -820,7 +917,7 @@ law-oi .oi | refl , refl , refl = refl
 
 \section{Things-with-Thinnings (a Monad)}
 
-%format / = "\D{/}"
+%format / = "\D{\Uparrow}"
 %format /_ = / _
 %format _/_ = _ / _
 %format ^ = "\C{\uparrow}"
@@ -828,7 +925,8 @@ law-oi .oi | refl , refl , refl = refl
 %format support = "\F{support}"
 %format thing = "\F{thing}"
 %format thinning = "\F{thinning}"
-%format map/ = "\F{map/}"
+%format map/ = "\F{map\!\Uparrow}"
+%format ; = ";\quad"
 
 Let us develop the habit of packing terms with an
 object in the slice category of thinnings,
@@ -873,9 +971,9 @@ adjacent $M$ layers may be merged pairwise in any order.
   \mu_{M(X)};\mu_X = M(\mu_X);\mu_X
 \]
 
-%format unit/ = "\F{unit/}"
-%format mult/ = "\F{mult/}"
-%format thin/ = "\F{thin/}"
+%format unit/ = "\F{unit\!\Uparrow}"
+%format mult/ = "\F{mult\!\Uparrow}"
+%format thin/ = "\F{thin\!\Uparrow}"
 The categorical structure of thinnings makes |/| a monad. Here,
 `adding a layer' amounts to `wrapping with a
 thinning'. The proof obligations to make $(|/|,|unit/|,|mult/|)$ a monad are
@@ -883,7 +981,7 @@ exactly those required to make $\OPE$ a category in the first place.
 In particular, things-with-thinnings are easy to thin further, indeed,
 parametrically so. In other words, |(T /)| is uniformly a functor from
 $\OPE$ to |Set|.
-\\
+\\ \hspace*{-0.2in}
 \parbox{1.5in}{
 \begin{spec}
 unit/ : T -:> (T /_)
@@ -927,17 +1025,14 @@ thin/ th t = mult/ (t ^ th)
 %which \emph{discover dependency}: they turn an |S| over any scope |kz|
 %into a |T| known to depend on at most some of the |kz|.
 
-Shortly, we shall give
-%exactly such
-an operation to discover the
-variables in scope on which a term syntactically depends. However,
-merely \emph{allowing} a thinning at the root, |LamTm / iz|, yields a poor
-representation of terms over |iz|, as we may choose whether to discard
-unwanted variables either at root or at leaves. To eliminate redundancy,
-we must \emph{insist} that a term's
-|support| is \emph{relevant}: if a variable is not discarded by the
-|thinning|, it \emph{must} be used in the |thing|. Or as Spike
-Milligan put it, `Everybody's got to be somewhere.'.
+Shortly, we shall learn how to find the
+variables on which a term syntactically depends. However,
+merely \emph{allowing} a thinning at the root, |LamTm / iz|, yields a
+redundant representation, as we may discard
+variables at either root or leaves. Let us eliminate redundancy
+by \emph{insisting} that a term's
+|support| is \emph{relevant}: a variable retained by the
+|thinning| \emph{must} be used in the |thing|. Everybody's got to be somewhere.
 
 
 \section{The Curious Case of the Coproduct in  Slices of $\OPE$}
@@ -952,15 +1047,17 @@ Bit vectors inherit Boolean structure, via the
 \paragraph{Initial object.~} A category $\mathbb{C}$ has initial object
 $0$, if there is a unique morphism in $\mathbb{C}(0,X)$ for every $X$.
 
-We are used to the \emph{empty type} playing this r\^ole for
-types-and-functions: empty case analysis gives
-the vacuously unique morphism. In $\OPE$, the
-empty \emph{scope} plays the same r\^ole, with the
-`constant 0' bit vector as unique morphism.
-By return of post, we obtain that $(|B0|,|oe|)$ is the initial object in the
-slice category |_ <= kz|.%format oe = "\F{oe}"
+%format oe = "\F{oe}"
 %format law-oe = "\F{law-}" oe
 %format oe/ = oe "\F{\slash}"
+The \emph{empty type} is famed for this r\^ole for
+types-and-functions: empty case analysis gives
+the vacuously unique morphism. In $\OPE$, the
+empty \emph{scope} plays this r\^ole, with the
+`constant 0' bit vector as unique morphism.
+By return of post, we get $(|B0|,|oe|)$ as the initial object in the
+slice category $\OPE/|kz|$. Hence, we can make \emph{constants} with empty support,
+i.e., noting that no variable is ($\cdot_R$ for) \emph{relevant}.
 %
 \vspace*{ -0.2in} \\
 \parbox[t]{2.9in}{
@@ -992,25 +1089,20 @@ oe/ th with tri oe th
 ... | t rewrite law-oe (oe <&= th) = oe , t
 \end{code}
 %endif
-
-We can now make \emph{constants} with empty support,
-i.e., noting that no variable is ($\cdot_R$ for) \emph{relevant}.
 %format OneR = One "_{R}"
 %format <>R = "\F{\langle\rangle}_{R}"
 \vspace*{ -0.2in} \\
-\parbox[t]{3in}{
+\parbox[t]{2.9in}{
 \begin{code}
 data OneR {K} : (Cix K) where  <> : OneR B0
 \end{code}}
-\parbox[t]{2in}{
+\parbox[t]{2.8in}{
 \begin{spec}
-<>R : OneR / kz
-<>R = <> ^ oe
+<>R : OneR / kz; <>R = <> ^ oe
 \end{spec}}
 %if False
 \begin{code}
-<>R : forall {K}{kz : Bwd K} -> OneR / kz
-<>R = <> ^ oe
+<>R : forall {K}{kz : Bwd K} -> OneR / kz; <>R = <> ^ oe
 \end{code}
 %endif
 
@@ -1026,7 +1118,7 @@ data OneR {K} : (Cix K) where  <> : OneR B0
 %format _,R_ = _ ,R _
 We should expect the constant to be the trivial case of some notion
 of \emph{relevant pairing}, induced by \emph{coproducts} in the slice category.
-If we have two objects in |(_ <= kz)| representing two subscopes, there should
+If we have two objects in $\OPE/|kz|$ representing two subscopes, there should
 be a smallest subscope which includes both: pairwise disjunction
 of bit vectors.
 
@@ -1056,7 +1148,7 @@ allowing $f' = |oz os o'|$ and $g' = |oz o' os|$. No $h'$
 post-composes $l$ and $r$ (both |oi|, making $h'$ itself)
 to yield $f'$ and $g'$ respectively.
 
-Fortunately, we shall get what we need. $\OPE$ may not have coproducts, but its
+Fortunately, we get what we need: $\OPE$ may not have coproducts, but its
 \emph{slices} do.
 %It is not the case that colimit structure in $\mathbb{C}/I$
 %arises \emph{only} via inheritance from $\mathbb{C}$.
@@ -1068,22 +1160,23 @@ Fortunately, we shall get what we need. $\OPE$ may not have coproducts, but its
 %format _cs' = _ cs'
 %format _css = _ css
 %format czz = "\C{czz}"
-Examine the data.
-We have two subscopes of some |kz|, |th : iz <= kz| and |ph : jz <= kz|. Their
+Examine the data: two subscopes of some |kz|, |th : iz <= kz| and |ph : jz <= kz|. Their
 coproduct must be some |ps : ijz <= kz|, where our $l$ and $r$ must be
-triangles |Tri th' ps th| and |Tri ph' ps ph|, giving us morphisms in
-|th ->/ ps| and |ph ->/ ps|, respectively. Intuitively, we should choose |ps|
-to be the pointwise disjunction of |th| and |ph|, so that |ijz| is as small
-as possible: |th'| and |ph'| will then \emph{cover} |ijz|. The flag, |ov|,
-determines whether \emph{overlap} is permitted: this should be |tt| for
-coproducts, but |ov = ff| allows the notion of \emph{partition}, too.
+triangles |Tri th' ps th| and |Tri ph' ps ph|, giving morphisms in
+|th ->/ ps| and |ph ->/ ps|. Choose |ps|
+to be pointwise disjunction of |th| and |ph|, minimizing |ijz|: |th'| and |ph'| will then \emph{cover} |ijz|.
 \begin{spec}
 data Cover {K}(ov : Two) : {iz jz ijz : Bwd K} -> iz <= ijz -> jz <= ijz -> Set where
-  _c's  : Cover ov th ph ->  Cover ov (th  o')  (ph  os)
-  _cs'  : Cover ov th ph ->  Cover ov (th  os)  (ph  o')
-  _css  : Cover ov th ph ->  Cover ov (th  os)  (ph  os)
-  czz   :                    Cover ov      oz        oz
+  _c's  :                    Cover ov th ph ->  Cover ov (th  o')  (ph  os)
+  _cs'  :                    Cover ov th ph ->  Cover ov (th  os)  (ph  o')
+  _css  : {both : Tt ov} ->  Cover ov th ph ->  Cover ov (th  os)  (ph  os)
+  czz   :                                       Cover ov      oz        oz
 \end{spec}
+The flag, |ov|,
+determines whether \emph{overlap} is permitted:|tt| for
+coproducts. |Cover ff| specifies \emph{partitions}.
+No constructor allows both |th| and |ph| to
+omit a target variable, so everybody's got to be somewhere.
 %if False
 \begin{code}
 data Cover {K}(ov : Two) : {iz jz ijz : Bwd K} -> iz <= ijz -> jz <= ijz -> Set where
@@ -1097,20 +1190,23 @@ data Cover {K}(ov : Two) : {iz jz ijz : Bwd K} -> iz <= ijz -> jz <= ijz -> Set 
 infixl 8 _c's _cs' _css
 \end{code}
 %endif
-Note that we have no constructor which allows both |th| and |ph| to
-omit a target variable: everybody's got to be somewhere. Let us compute
-the coproduct, then check its universal property.
+Let us compute
+the coproduct, |ps| then check that any other diagram for
+some |ps'| yields a |ps ->/ ps'|.
 %format cop = "\F{cop}"
+%format copU = "\F{copU}"
 \vspace*{ -0.2in} \\
 %\noindent
 \parbox{4in}{
-\begin{code}
-cop :  forall {K}{kz iz jz : Bwd K}
-       (th : iz <= kz)(ph : jz <= kz) ->
-       Sg _ \ ijz -> Sg (ijz <= kz) \ ps ->
-       Sg (iz <= ijz) \ th' -> Sg (jz <= ijz) \ ph' ->
-       Tri th' ps th * Cover tt th' ph' * Tri ph' ps ph
-\end{code}}
+\begin{spec}
+cop   :  (th : iz <= kz)(ph : jz <= kz) ->
+         Sg _ \ ijz -> Sg (ijz <= kz) \ ps ->
+         Sg (iz <= ijz) \ th' -> Sg (jz <= ijz) \ ph' ->
+         Tri th' ps th * Cover tt th' ph' * Tri ph' ps ph
+
+copU  :  Tri th' ps th -> Cover tt th' ph' -> Tri ph' ps ph ->
+         th ->/ ps' -> ph ->/ ps' -> ps ->/ ps'
+\end{spec}}
 \parbox{2in}{
 \[\xymatrix{
  |iz| \ar[rrrd]^{|th|} \ar@@{.>}[rd]_{|th'|} &&& \\
@@ -1118,6 +1214,16 @@ cop :  forall {K}{kz iz jz : Bwd K}
  |jz| \ar[rrru]_{|ph|} \ar@@{.>}[ru]^{|ph'|} &&& \\
 }\]}
 \vspace*{ -0.2in}
+%if False
+\begin{code}
+cop   :  forall {K}{kz iz jz : Bwd K}
+         (th : iz <= kz)(ph : jz <= kz) ->
+         Sg _ \ ijz -> Sg (ijz <= kz) \ ps ->
+         Sg (iz <= ijz) \ th' -> Sg (jz <= ijz) \ ph' ->
+         Tri th' ps th * Cover tt th' ph' * Tri ph' ps ph
+\end{code}
+%endif
+\newpage   %%%%%%%%% GRRRR
 \begin{code}
 cop (th  o') (ph  o')  = let ! ! ! ! tl , c , tr = cop th ph in  ! ! ! ! tl  t-''  , c       , tr  t-''
 cop (th  o') (ph  os)  = let ! ! ! ! tl , c , tr = cop th ph in  ! ! ! ! tl  t's'  , c  c's  , tr  tsss
@@ -1125,15 +1231,7 @@ cop (th  os) (ph  o')  = let ! ! ! ! tl , c , tr = cop th ph in  ! ! ! ! tl  tss
 cop (th  os) (ph  os)  = let ! ! ! ! tl , c , tr = cop th ph in  ! ! ! ! tl  tsss  , c  css  , tr  tsss
 cop      oz       oz   =                                         ! ! ! !     tzzz  ,    czz  ,     tzzz
 \end{code}
-To show that we have really computed a coproduct, we must show
-that any other pair of triangles from |th| and |ph| to
-some |ps'| must induce a (unique) morphism from |ps| to |ps'|.
-%format copU = "\F{copU}"
-\begin{spec}
-copU :  Tri th' ps th -> Cover tt th' ph' -> Tri ph' ps ph ->
-        forall {ijz'}{ps' : ijz' <= kz} -> th ->/ ps' -> ph ->/ ps' -> ps ->/ ps'
-\end{spec}
-The construction goes by induction on the triangles which share |ps'|
+The |copU| proof goes by induction on the triangles which share |ps'|
 and inversion of the coproduct.
 %if False
 \begin{code}
@@ -1172,8 +1270,7 @@ the co-de-Bruijn touchstone:
 \begin{spec}
 record _*R_ (S T : (Cix K))(ijz : Bwd K) : Set where
   constructor pair
-  field  outl   : S / ijz
-         outr   : T / ijz
+  field  outl   : S / ijz; outr : T / ijz
          cover  : Cover tt (thinning outl) (thinning outr)
 \end{spec}}
 \parbox[t]{2in}{
@@ -1188,8 +1285,7 @@ _,R_ : S / kz -> T / kz -> (S *R T) / kz
 \begin{code}
 record _*R_ {K}(S T : (Cix K))(ijz : Bwd K) : Set where
   constructor pair
-  field  outl   : S / ijz
-         outr   : T / ijz
+  field  outl : S / ijz ; outr   : T / ijz
          cover  : Cover tt (thinning outl) (thinning outr)
 
 _,R_ : forall {K}{S T : (Cix K)}{kz} -> S / kz -> T / kz -> (S *R T) / kz
@@ -1317,7 +1413,7 @@ vaR x = only ^ x
 \end{code}
 %endif
 
-\vspace*{- 0.2in}
+\vspace*{ -0.2in}
 %format combK = "\F{\mathbb{K}}"
 %format combS = "\F{\mathbb{S}}"
 \paragraph{Untyped $\lambda$-calculus.~}
@@ -1356,11 +1452,9 @@ lamTmR combS  =  lam (oz os \\ lam (oz os \\ lam (oz os \\
              (app  (pair (var only ^ oz os o') (var only ^ oz o' os) (czz cs' c's))  ^ oz o' os os)
              (czz cs' c's css)) ))) ^ oz
 \end{spec}
-Staring bravely, we see that |combK| uses its first argument
-to deliver a plainly constant function: the second |lam|
-discards its argument. Meanwhile,
-|combS| clearly uses all three inputs (`function', `argument',
-`environment'): in the application, the function goes
+Stare bravely! |combK| returns a plainly constant function.
+Meanwhile,
+|combS| clearly uses all three inputs: the function goes
 left, the argument goes right, and the environment is shared.
 
 
@@ -1420,10 +1514,9 @@ We may give the syntax of each sort as a function mapping sorts to
 |D : I -> Desc I|.
 \begin{spec}
 data Desc (I : Set) : Set1 where
-  RecD   : Kind I ->                              Desc I
-  OneD   :                                        Desc I
-  _*D_   : Desc I -> Desc I ->                    Desc I
-  SgD    : (S : Datoid) -> (Data S -> Desc I) ->  Desc I
+  RecD   : Kind I ->  Desc I;  SgD    : (S : Datoid) -> (Data S -> Desc I) ->  Desc I
+  OneD   :            Desc I;  _*D_   : Desc I -> Desc I ->                    Desc I
+  
 \end{spec}
 We may ask for a subterm with a given |Kind|, so it can bind
 variables by listing their |Kind|s left of |=>|. Descriptions
@@ -1451,10 +1544,8 @@ record Datoid : Set1 where
 open Datoid
 
 data Desc (I : Set) : Set1 where
-  RecD   : Kind I ->                              Desc I
-  SgD    : (S : Datoid) -> (Data S -> Desc I) ->  Desc I
-  OneD   :                                        Desc I
-  _*D_   : Desc I -> Desc I ->                    Desc I
+  RecD   : Kind I ->  Desc I ;  SgD    : (S : Datoid) -> (Data S -> Desc I) ->  Desc I
+  OneD   :            Desc I ;  _*D_   : Desc I -> Desc I ->                    Desc I
 \end{code}
 %endif
 
@@ -1477,7 +1568,7 @@ decide  LAMTAG app  lam  = no \ ()
 decide  LAMTAG lam  app  = no \ ()
 decide  LAMTAG lam  lam  = yes refl
 \end{code}}
-\vspace*{ -0.2in}
+\vspace*{ -0.3in}
 \begin{code}
 LamD : One -> Desc One
 LamD <> = SgD LAMTAG \  { app  -> RecD (B0 => <>) *D RecD (B0 => <>)
@@ -1487,6 +1578,39 @@ Note that we do not and cannot include a tag or description for
 the use sites of variables in terms: use of variables in scope
 pertains not to the specific syntax, but to the general notion
 of what it is to be a syntax.
+
+%if False
+\begin{code}
+data Ty : Set where base : Ty ; _>>_ : Ty -> Ty -> Ty
+infixr 4 _>>_
+TY : Datoid
+Data TY = Ty
+decide TY base base = yes refl
+decide TY base (_ >> _) = no \ ()
+decide TY (_ >> _) base = no \ ()
+decide TY (sx >> tx) (sy >> ty) with decide TY sx sy | decide TY tx ty
+decide TY (sx >> tx) (.sx >> .tx) | yes refl | yes refl = yes refl
+decide TY (sx >> tx) (sy >> ty) | yes _ | no p = no \ { refl -> p refl }
+decide TY (sx >> tx) (sy >> ty) | no p | _ = no \ { refl -> p refl }
+
+data TyLTag : Ty -> Set where
+  app : forall {T} -> TyLTag T
+  lam : forall {S T} -> TyLTag (S >> T)
+
+TYLTAG : Ty -> Datoid
+Data (TYLTAG T) = TyLTag T
+decide (TYLTAG T) app app = yes refl
+decide (TYLTAG .(_ >> _)) app lam = no \ ()
+decide (TYLTAG .(_ >> _)) lam app = no \ ()
+decide (TYLTAG .(_ >> _)) lam lam = yes refl
+
+LTyD : Ty -> Desc Ty
+LTyD T = SgD (TYLTAG T) \  { app -> SgD TY \ S -> RecD (B0 => (S >> T)) *D RecD (B0 => S)
+                           ; (lam {S}{T}) -> RecD (B0 - (B0 => S) => T) }
+\end{code}
+%endif
+
+
 
 \paragraph{Interpreting |Desc| as de Bruijn Syntax.~}
 %format [! = "\F{\llbracket}"
@@ -1561,13 +1685,13 @@ combSD  =  [ lam ,  [ lam ,  [ lam ,  [ app  , [ app , oe os o' o' #$ <> , oe os
 \end{spec}
 %endif
 
-\vspace*{- 0.2in}
+\vspace*{ -0.2in}
 %format code = "\F{code}"
 %format codes = "\F{codes}"
 \paragraph{Interpreting |Desc| as co-de-Bruijn Syntax.~}
 Now let us interpret |Desc|riptions in co-de-Bruijn style,
 enforcing that all variables in scope are relevant, and that
-binding sites expose vacuity. We can compute co-de-Bruijn terms from de Bruijn terms, generically.
+binding sites expose vacuity.
 %format !]R = "\F{\rrbracket}_R"
 %format [!_!!_!]R = [! _ !! _ !]R
 %format TmR = Tm "_R"
@@ -1582,7 +1706,10 @@ binding sites expose vacuity. We can compute co-de-Bruijn terms from de Bruijn t
 data TmR {I}(D : I -> Desc I)(i : I) : (Cix (Kind I)) where
   #     : forall {jz} -> (VaR (jz => i) *R  [! SpD jz  !! TmR D !]R)  -:>  TmR D i
   [_]   :                                   [! D i     !! TmR D !]R   -:>  TmR D i
+\end{code}
 
+We can compute co-de-Bruijn terms from de Bruijn terms, generically.
+\begin{code}
 code   : forall {I}{D : I -> Desc I}{i}  ->  Tm D i           -:>  (TmR D i /_)
 codes  : forall {I}{D : I -> Desc I} S   ->  [! S !! Tm D !]  -:>  ([! S !! TmR D !]R /_)
 code                    (_#$_ {jz} x ts)  = map/ #    (vaR x ,R codes (SpD jz) ts)
@@ -1592,6 +1719,13 @@ codes (SgD S T)         (s , ts)          = map/ (s ,_) (codes (T s) ts)
 codes OneD              <>                = <>R
 codes (S *D T)          (ss , ts)         = codes S ss ,R codes T ts
 \end{code}
+
+%if False
+\begin{code}
+tyS : (A B C : Ty) -> Tm LTyD ((A >> B >> C) >> (A >> B) >> (A >> C)) B0
+tyS A B C = [ lam , [ lam , [ lam , [ app , _ , [ app , _ , oz os o' o' #$ <> , oz o' o' os #$ <> ] , [ app , _ , oz o' os o' #$ <> , oz o' o' os #$ <> ] ] ] ] ]
+\end{code}
+%endif
 
 
 \section{Hereditary Substitution for Co-de-Bruijn Metasyntax}
