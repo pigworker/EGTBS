@@ -13,7 +13,7 @@
 \newcommand{\F}[1]{\green{\ensuremath{\mathsf{#1}}}}
 \newcommand{\V}[1]{\purple{\ensuremath{\mathit{#1}}}}
 
-\newcommand{\OPE}[1]{\Updelta_+^{#1}}
+\newcommand{\OPE}[1]{\Updelta_{\!+}^{#1}}
 
 \title{Everybody's Got To Be Somewhere}
 \author{
@@ -308,9 +308,9 @@ more.  Dually, we may see such a morphism as
 expelling variables from the target scope, leaving a particular
 selection as the source.  I write the step constructors postfix,
 so thinnings (like scopes) grow on the right. When |K = One|,
-|Bwd K| represents natural numbers and |<=| generates Pascal's
+|Bwd K| represents numbers and |<=| generates Pascal's
 Triangle; excluding the empty scope and allowing \emph{degenerate}
-(non-injective) maps yields the \emph{simplex} category, beloved of topologists.
+(non-injective) maps yields $\Delta$, the \emph{simplex} category beloved of topologists.
 
 %if False
 \begin{code}
@@ -846,11 +846,11 @@ called a \emph{contravariant functor} from $\mathbb{C}$ to $\mathbb{D}$.
 %$\OPE{}$.
 
 \noindent\parbox{3.5in}{\par
-E.g., $\op{\OPE{}}(|jz|,|iz|) = |iz <= jz|$ views thinnings as
+E.g., $\op{\OPE{}\!\!\!\!\!\!}(|jz|,|iz|) = |iz <= jz|$ views thinnings as
 \emph{selections} of just |iz| from the |jz| on offer.
 As shown, right, an environment for all the |jz| whittles down to
 just the |iz|, making
-|All P| a \emph{presheaf} on $\OPE{}$ --- a \emph{functor} from $\op{\OPE{}}$ to |Set|.}
+|All P| a \emph{presheaf} on $\OPE{}$ --- a \emph{functor} from $\op{\OPE{}\!\!\!\!\!\!}$ to |Set|.}
 %format <?= = "\F{\le\!?}"
 %format _<?=_ = _ <?= _
 %format <?=_ = <?= _
