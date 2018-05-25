@@ -1,7 +1,13 @@
 default : EGTBS.pdf
 
-EGTBS.tex : EGTBS.lagda
-	lhs2TeX --agda --poly EGTBS.lagda > EGTBS.tex
+hide : Hide.hs
+	ghc --make -o hide Hide
+
+EGTBS.hide.lagda : EGTBS.lagda
+	./hide < EGTBS.lagda > EGTBS.hide.lagda
+
+EGTBS.tex : EGTBS.hide.lagda
+	lhs2TeX --agda --poly EGTBS.hide.lagda > EGTBS.tex
 
 EGTBS.aux : EGTBS.tex
 	pdflatex EGTBS

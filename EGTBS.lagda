@@ -294,12 +294,12 @@ infixl 7 _-_
 \end{code}
 %endif
 \parbox[t]{3in}{
-\begin{spec}
-data _<=_ : Bwd K -> Bwd K -> Set where
-  _o'  : iz <= jz ->     iz          <=  (jz  -   k)
-  _os  : iz <= jz ->  (  iz  -   k)  <=  (jz  -   k)
-  oz   :                     B0      <=       B0
-\end{spec}}
+\begin{code}
+data _<=_ {-<-}{K}{->-} : Bwd K -> Bwd K -> Set where
+  _o'  : {-<-}forall {iz jz k} ->{->-}  iz <= jz ->     iz          <=  (jz  -   k)
+  _os  : {-<-}forall {iz jz k} ->{->-}  iz <= jz ->  (  iz  -   k)  <=  (jz  -   k)
+  oz   :                                                    B0      <=       B0
+\end{code}}
 
 The morphisms, |iz <= jz|, of $\OPE{}$ give an embedding from a source
 to a target scope. Colloquially, we may call them
@@ -313,12 +313,12 @@ Triangle; excluding the empty scope and allowing \emph{degenerate}
 (non-injective) maps yields $\Delta$, the \emph{simplex} category beloved of topologists.
 
 %if False
-\begin{code}
+\begin{spec}
 data _<=_ {K} : Bwd K -> Bwd K -> Set where
   _o'  : forall {iz jz k} ->  iz <= jz ->     iz          <=  (jz  -   k)
   _os  : forall {iz jz k} ->  iz <= jz ->  (  iz  -   k)  <=  (jz  -   k)
   oz   :                                          B0      <=       B0
-\end{code}
+\end{spec}
 \begin{code}
 infixl 8 _o' _os
 \end{code}
