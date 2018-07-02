@@ -44,7 +44,7 @@
 
 %if False
 \begin{code}
-module EGTBS where
+module EGTBS-Try where
 \end{code}
 %endif
 
@@ -746,12 +746,7 @@ S -:> T = forall {i} -> S i -> T i
 %endif
 %
 Morphisms are equal if they map each index to pointwise equal functions.
-In the sequel, it will be convenient to abbreviate
-|Bwd K -> Set| as |(Cix K)|, for types indexed over scopes.
 
-
-
-%if False
 We may define a functor from |K -> Set| to |Bwd K -> Set| as follows:
 %
 %format All = "\D{All}"
@@ -770,17 +765,17 @@ all f (pz - p)  = all f pz - f p
 \\
 \begin{tabular}{@@{}l||l@@{}}
 \raisebox{0.7in}[0.6in][0in]{\parbox[t]{3.5in}{
-\begin{code}
+\begin{code}{-
 data  All {-<-}{K}{->-}(P : K -> Set) : Bwd K -> Set where
   B0   :                                                All P B0
-  _-_  : {-<-}forall {kz k} ->{->-} All P kz -> P k ->  All P (kz - k)
+  _-_  : {-<-}forall {kz k} ->{->-} All P kz -> P k ->  All P (kz - k)-}
 \end{code}}}
 & \hspace*{ -0.3in}
 \raisebox{0.7in}[0.6in][0in]{\parbox[t]{2.3in}{
-\begin{code}
+\begin{code}{-
 all : {-<-}forall {K}{P Q : K -> Set} ->{->-} (P -:> Q) -> (All P -:> All Q)
 all f B0        = B0
-all f (pz - p)  = all f pz - f p
+all f (pz - p)  = all f pz - f p-}
 \end{code}}}
 \end{tabular}
 
@@ -825,11 +820,11 @@ just the |iz|, making
 %format _<?=_ = _ <?= _
 %format <?=_ = <?= _
 \parbox{2in}{\vspace*{ -0.1in}
-\begin{code}
+\begin{code}{-
 _<?=_ : {-<-} forall {K P}{jz iz : Bwd K} ->{->-} iz <= jz -> All P jz -> All P iz
 oz       <?= B0        = B0
 (th os)  <?= (pz - p)  = (th <?= pz) - p
-(th o')  <?= (pz - p)  = th <?= pz
+(th o')  <?= (pz - p)  = th <?= pz-}
 \end{code}\vspace*{ -0.3in}}
 %It is not hard to check that the identity selection (selecting all
 %elements) acts as the identity on environments, and that composition
@@ -855,7 +850,7 @@ from |K -> Set| to |Set|. Accordingly, if |th : iz <= jz| then
 |\ P -> All P iz|, which is as much as to say that the definition of
 |<?=| is uniform in |P|, and hence that if |f : forall {k} -> P k -> Q k|, then
 |all f (th <?= pz)| = |th <?= all f pz|.
-%endif
+
 
 Dependently typed programming thus offers us a richer seam of
 categorical structure than we see in Haskell. This presents an opportunity
@@ -1686,8 +1681,9 @@ Let us work through it slowly.
 \begin{code}
 record HSub {I}  (D        : I -> Desc I)   -- the underlying syntax
                  (src trg  : Bwd (Kind I))  -- source and target scopes
-                 (bnd      : Bwd (Kind I))  -- the termination bound
+                 (act      : Bwd (Kind I))  -- the termination bound
                  : Set where
+  constructor _<[_]>_
   field -- to follow
 \end{code}
 While |D|, |src| and |trg| indicate the task at hand, an extra scope parameter,
@@ -1698,29 +1694,29 @@ tricks~\cite{DBLP:journals/jfp/McBride03}. Let us see how, presently.
 The key to the design is to |parti|tion the source scope into |passive| and
 |active| variables:
 \begin{code}
-    pass act   : Bwd (Kind I)
-    passive    : pass  <= src
-    active     : act   <= src
+    {pass}       : Bwd (Kind I)
+    {passive}    : pass  <= src
+    {active}     : act   <= src
+    passTrg  : pass  <= trg
     parti      : Cover ff passive active  -- |ff| forbids overlap
 \end{code}
 The |passive| variables are those to be thinned, growing by any binders we pass under.
 \begin{code}
-    passTrg  : pass  <= trg
 \end{code}
 The |active| variables are those to be substituted by suitably parametrized terms.
 \begin{code}
-    images  : All (\ k -> (scope k !- TmR D (sort k)) / trg) act
+    images  : [! SpD act !! TmR D !]R / trg
 \end{code}
 Now, we may initialize the |bnd| to be a copy of |act| and maintain the following
 invariant:
 \begin{code}
-    actBnd  : act <= bnd
 \end{code}
 
 %format ; = ";"
 %if False
 \begin{code}
 open HSub
+infixr 2 _<[_]>_
 \end{code}
 %endif
 
@@ -1753,18 +1749,34 @@ those source variables which remain, hence the |selPart| operation, a
 straightforward induction.
 %if False
 \begin{code}
-wkHSub :  forall {I}{D : I -> Desc I}{src trg bnd iz jz} ->
-          HSub D src trg bnd -> iz <= jz -> HSub D (src ++ iz) (trg ++ jz) bnd
-wkHSub {iz = iz}{jz = jz} h ph = record
-  { parti = bindPassive iz ; actBnd = actBnd h ; passTrg = passTrg h <++= ph
-  ; images = all (thin/ (oi <++= oe {kz = jz})) (images h) } where
-  bindPassive : forall iz -> Cover ff (passive h <++= oi {kz = iz}) (active h <++= oe {kz = iz})
-  bindPassive B0       = parti h
-  bindPassive (iz - _) = bindPassive iz cs'
+lefts : forall {K}(iz jz : Bwd K) -> iz <= (iz ++ jz)
+lefts iz jz = oi {kz = iz} <++= oe {kz = jz}
+
+rights : forall {K}(iz jz : Bwd K) -> jz <= (iz ++ jz)
+rights iz (jz - j) = rights iz jz os
+rights iz B0 = oe
+
+leftC : forall {K ov}(kz : Bwd K) -> Cover ov (oi {kz = kz}) oe
+leftC (kz - k) = leftC kz cs'
+leftC B0 = czz
+
+_+C+_ : forall {K ov}
+          {iz jz kz : Bwd K}{th : iz <= kz}{ph : jz <= kz} ->
+          {iz' jz' kz' : Bwd K}{th' : iz' <= kz'}{ph' : jz' <= kz'} ->
+              Cover ov th ph -> Cover ov th' ph' -> 
+              Cover ov (th <++= th') (ph <++= ph')
+c +C+ (d c's) = (c +C+ d) c's
+c +C+ (d cs') = (c +C+ d) cs'
+c +C+ (_css {both = b} d) = _css {both = b} (c +C+ d)
+c +C+ czz = c
+
+wkHSub :  forall {I}{D : I -> Desc I}{src trg act} ->
+          HSub D src trg act -> forall jz -> HSub D (src ++ jz) (trg ++ jz) act
+wkHSub (ph <[ p ]> vs) jz = (ph <++= oi {kz = jz}) <[ p +C+ leftC jz ]> thin/ (lefts _ jz) vs
 \end{code}
 
 \begin{code}
-mutual
+{- mutual -}
 \end{code}
 %endif
 \begin{spec}
@@ -1778,24 +1790,27 @@ mutual
 \end{spec}
 %if False
 \begin{code}
+{-
   selHSub :  forall {I}{D : I -> Desc I}{src src' trg bnd} ->
              src <= src' -> HSub D src' trg bnd -> HSub D src trg bnd
   selHSub ps (record { parti = c' ; actBnd = th' ; images = tz' ; passTrg = ph' }) =
     let ! ! ! ! ph , th , c = selPart ps c' in record
       { parti = c ; actBnd = th <&= th' ; images = th <?= tz' ; passTrg = ph <&= ph' }
-
-  selPart :  forall {K}{iz' jz' kz kz' : Bwd K}{th' : iz' <= kz'}{ph' : jz' <= kz'}
+-}
+{-
+selPart :  forall {K}{iz' jz' kz kz' : Bwd K}{th' : iz' <= kz'}{ph' : jz' <= kz'}
              (ps : kz <= kz') -> Cover ff th' ph' ->
              Sg _ \ iz -> Sg _ \ jz -> Sg (iz <= kz) \ th -> Sg (jz <= kz) \ ph ->
              Sg (iz <= iz') \ ps0 -> Sg (jz <= jz') \ ps1 -> Cover ff th ph
 
-  selPart (ps o') (c' c's) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0    , ps1 o' , c
-  selPart (ps o') (c' cs') = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 o' , ps1 , c
-  selPart (ps o') (c' css) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 o' , ps1 o' , c
-  selPart (ps os) (c' c's) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 , ps1 os , c c's
-  selPart (ps os) (c' cs') = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 os , ps1 , c cs'
-  selPart (ps os) (_css {both = ()} _)
-  selPart oz czz = ! ! ! ! oz , oz , czz
+selPart (ps o') (c' c's) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0    , ps1 o' , c
+selPart (ps o') (c' cs') = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 o' , ps1 , c
+selPart (ps o') (c' css) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 o' , ps1 o' , c
+selPart (ps os) (c' c's) = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 , ps1 os , c c's
+selPart (ps os) (c' cs') = let ! ! ! ! ps0 , ps1 , c = selPart ps c' in ! ! ! ! ps0 os , ps1 , c cs'
+selPart (ps os) (_css {both = ()} _)
+selPart oz czz = ! ! ! ! oz , oz , czz
+-}
 \end{code}
 %endif
 
@@ -1814,14 +1829,46 @@ allLeft czz = refl
 %format hered = "\F{hered}"
 %if False
 \begin{code}
-hSub    : forall {I D src trg bnd}{i : I} ->
-  HSub D src trg bnd -> TmR D i src              -> TmR D i / trg
-hSubs   : forall {I D src trg bnd}(S : Desc I) ->
-  HSub D src trg bnd -> [! S !! TmR D !]R src    -> [! S !! TmR D !]R / trg
-hSubs/  : forall {I D src trg bnd}(S : Desc I) ->
-  HSub D src trg bnd -> [! S !! TmR D !]R / src  -> [! S !! TmR D !]R / trg
-hered   : forall {I D jz trg bnd}{i : I} ->
-  (jz !- TmR D i) / trg -> B0 - (jz => i) <= bnd -> [! SpD jz !! TmR D !]R / trg -> TmR D i / trg
+outlR : {-<-}forall {K}{S T : (Cix K)}{kz} ->{->-}  (S *R T) / kz -> S / kz
+outlR (pair s _ _ ^ ps) = thin/ ps s
+outrR : {-<-}forall {K}{S T : (Cix K)}{kz} ->{->-}  (S *R T) / kz -> T / kz
+outrR (pair _ t _ ^ ps) = thin/ ps t
+
+
+
+part : forall {K}(iz jz : Bwd K) -> Cover ff (lefts iz jz)
+                                             (rights iz jz)
+part iz (jz - j) = part iz jz c's
+part (iz - i) B0 = part iz B0 cs'
+part B0 B0 = czz
+
+hSub    : forall {I D iz src trg act}{i : I} ->
+  HSub D src trg act -> TmR D i iz -> iz <= src  -> TmR D i / trg
+hSubs   : forall {I D}{iz src trg act}(S : Desc I) ->
+  HSub D src trg act -> [! S !! TmR D !]R iz  -> iz <= src   -> [! S !! TmR D !]R / trg
+hered   : forall {I D}{iz jz src trg act}{i : I} ->
+  HSub D src trg act -> B0 - (jz => i) <= iz -> iz <= src ->
+  [! SpD jz !! TmR D !]R / trg -> TmR D i / trg
+
+hSub {act = B0} (ph <[ p ]> _) t th with allLeft p
+hSub {act = B0} (ph <[ p ]> _) t ps | refl = t ^ (ps <&= ph)
+hSub h (# {jz} (pair (only ^ x) (ss ^ ph) c)) ps =
+  hered h x ps (hSubs (SpD jz) h ss (ph <&= ps))
+hSub {D = D} {i = i} h [ ts ] ps = map/ [_] (hSubs (D i) h ts ps)
+hSubs (RecD (jz => i)) h (ch \\ t) th = jz \\R hSub (wkHSub h jz) t (th <++= ch)
+hSubs (SgD S T) h (s , ts) th = map/ (s ,_) (hSubs (T s) h ts th)
+hSubs OneD h ts th = <>R
+hSubs (S *D T) h (pair (s ^ th) (t ^ ph) _) ps =
+  hSubs S h s (th <&= ps) ,R hSubs T h t (ph <&= ps)
+hered _ () oz _
+hered (ph <[ _css {both = ()} _ ]> vs) _ _ _
+hered (ph <[ p c's ]> vs) x (ps o') ss = hered (ph <[ p ]> outlR vs) x ps ss
+hered (ph <[ p cs' ]> vs) x (ps o') ss = hered (oi o' <&= ph <[ p ]> vs) x ps ss
+hered (ph <[ p c's ]> vs) (x o') (ps os) ss = hered (ph <[ p ]> outlR vs) x ps ss
+hered (ph <[ p cs' ]> vs) (x o') (ps os) ss = hered (oi o' <&= ph <[ p ]> vs) x ps ss
+hered {jz = jz} {trg = trg} {act = .(_ - (jz => i))} {i = i} (_ <[ p c's ]> vs) (x os) (ps os) ss with outrR vs
+hered {jz = jz} {trg = trg} {act = .(_ - (jz => i))} {i = i} (_ <[ p c's ]> vs) (x os) (ps os) ss | (ch \\ t) ^ ph = hSub {act = jz} (oi <[ part trg jz ]> ss) t (ph <++= ch)
+hered (ph <[ p cs' ]> vs) (x os) (ps os) ss = map/ # (((only ^ (oe os <&= ph)) ,R ss))
 \end{code}
 %endif
 
@@ -1837,12 +1884,12 @@ hered   : (jz !- TmR D i) / trg -> B0 - (jz => i) <= bnd -> [! SpD jz !! TmR D !
 When |hSub| finds a variable, |selHSub| will reduce the |parti| to a single choice:
 if the variable is passive, embed it in target scope and reattach its substituted spine;
 if active, proceed |hered|itarily.
-\begin{code}
+\begin{code}{-
 hSub {D = D}{i = i} h [ ts ] = map/ [_] (hSubs (D i) h ts)
 hSub h (# {jz} (pair (only ^ th) ts _)) with selHSub th h | hSubs/ (SpD jz) h ts
 ... | record { parti = _css {both = ()} _ }                         | ts'
 ... | record { parti = czz cs' ; passTrg = ph }                     | ts' = map/ # (vaR ph ,R ts')
-... | record { parti = czz c's ; actBnd = th' ; images = B0 - im }  | ts' = hered im th' ts'
+... | record { parti = czz c's ; actBnd = th' ; images = B0 - im }  | ts' = hered im th' ts' -}
 \end{code}
 
 %format part = "\F{part}"
@@ -1851,20 +1898,20 @@ To substitute a variable |hered|itarily, find it in the bound: the scope of its
 kind becomes the new, \emph{structurally smaller} bound. Helper function |part| partitions
 passive free variables from active bound variables, while |spAll| converts the spine to an
 environment of images.
-\begin{code}
+\begin{code}{-
 hered                     im                (th' o') ts' = hered im th' ts'
 hered {D = D}{trg = trg}  ((ph \\ t) ^ ps)  (th' os) ts' = let ! ! c = part _ _ in 
   hSub (record { parti = c ; actBnd = ph ; images = ph <?= spAll ts' ; passTrg = ps }) t where
     spAll  :  forall {kz} -> [! SpD kz !! TmR D !]R / trg -> All _ kz
-    part   :  forall kz iz -> Sg (kz <= (kz ++ iz)) \ th -> Sg (iz <= (kz ++ iz)) \ th' -> Cover ff th th'
+    part   :  forall kz iz -> Sg (kz <= (kz ++ iz)) \ th -> Sg (iz <= (kz ++ iz)) \ th' -> Cover ff th th' -}
 \end{code}
 %if False
-\begin{code}
+\begin{code}{-
     spAll {B0}              _                    = B0
     spAll {kz - (jz => i)}  (pair ts' t _ ^ ps)  = spAll (thin/ ps ts') - thin/ ps t
     part kz (iz - _) = let ! ! c = part kz iz in ! ! c c's
     part (kz - _) B0 = let ! ! c = part kz B0 in ! ! c cs'
-    part B0 B0 = ! ! czz
+    part B0 B0 = ! ! czz -}
 \end{code}
 %endif
 
@@ -1872,7 +1919,7 @@ In the structural part of the algorithm, we may exploit our richer usage informa
 to stop as soon as the active variables have all left scope,
 thinning the remaining passive variables with no further traversal. The lemma |allLeft| shows
 that if the right of a partition is empty, the left must be full.
-\begin{code}
+\begin{code}{-
 hSubs (RecD k)   h (ph \\ t)     = scope k \\R hSub (wkHSub h ph) t
 hSubs (SgD S T)  h (s , ts)      = map/ (s ,_) (hSubs (T s) h ts)
 hSubs OneD       h <>            = <>R
@@ -1880,6 +1927,7 @@ hSubs (S *D T)   h (pair s t _)  = hSubs/ S h s ,R hSubs/ T h t
 hSubs/ S h' (ts ^ th) with selHSub th h'
 hSubs/ S h' (ts ^ th) | record { parti = c ; images = B0 ; passTrg = ph } rewrite allLeft c = ts ^ ph
 hSubs/ S h' (ts ^ th) | h = hSubs S h ts
+-}
 \end{code}
 
 
