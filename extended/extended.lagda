@@ -220,8 +220,8 @@ data _!!-_ (Ga : Context) : Type -> Set where
 \end{code}
 
 Observe that the context we are handed at the root of a term only ever gets
-larger, each time we use a |la|mbda. Only when we reach a |va|riable to we
-choose one thing from the context and discard the rest.
+larger, each time we use a |la|mbda. Only when we reach a |va|riable do we
+choose one thing from the context and disregard the rest.
 
 Now, a \emph{simultaneous substitution} is a type-respecting mapping from
 variables in some source context |Ga| to terms over target context |De| ---
