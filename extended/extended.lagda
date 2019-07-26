@@ -40,6 +40,22 @@
 %format forall = "\D{\forall}"
 %format . = "."
 
+%format sb0 = "_{\V{0}}"
+%format sb1 = "_{\V{1}}"
+%format sb2 = "_{\V{2}}"
+%format sb3 = "_{\V{3}}"
+%format sb01 = "_{\V{01}}"
+%format sb12 = "_{\V{12}}"
+%format sb23 = "_{\V{23}}"
+%format sb02 = "_{\V{02}}"
+%format sb13 = "_{\V{13}}"
+%format sb03 = "_{\V{03}}"
+%format sb012 = "_{\V{012}}"
+%format sb013 = "_{\V{013}}"
+%format sb023 = "_{\V{023}}"
+%format sb123 = "_{\V{123}}"
+
+
 %if False
 \begin{code}
 open import Agda.Primitive renaming (_⊔_ to _\-/_)
@@ -453,7 +469,9 @@ module _ {X : Set} where
 
     []     :                                                                                                    (CTri []         []         [])
 
-CTS3 = CTri
+  CTS1 = \ {ga}{de}{ze} ph ps th -> CTri {ga}{de}{ze} th ph ps
+  CTS2 = \ {ga}{de}{ze} th ps ph -> CTri {ga}{de}{ze} th ph ps
+  CTS3 = CTri
 \end{code}
 %endif
 \begin{spec}
@@ -499,7 +517,7 @@ pragmatically suboptimal, as I shall explain later. A better move is to reimplem
 We shall have need of existential quantification!
 
 %format Sg = "\D{\Upsigma}"
-\begin{definition}[Dependent Pair Types]
+\begin{definition}[Dependent Pair Types, Unit Type]
 Dependent pair types (|Sg|-types, in the jargon) may be introduced as
 \emph{records}, where the
 type of the second projection depends on the value of the first. The definition
@@ -512,6 +530,8 @@ is polymorphic in the type theoretic hierarchy.
 %format _,_ = "\C{" _ "}" , "\C{" _ "}"
 %format fst = "\F{fst}"
 %format snd = "\F{snd}"
+%format One = "\D{One}"
+%format <> = "\C{\langle\rangle}"
 \begin{code}
 infixr 5 _,_
 
@@ -522,6 +542,8 @@ record Sg {k l}(S : Set k)(T : S -> Set l) : Set (l \-/ k) where
 open Sg public     -- brings the projections into scope
 
 syntax Sg S (\ x -> T) = [* x :: S ]* T
+
+record One {l} : Set l where constructor <>
 \end{code}
 It is convenient to sugar dependent pair types as a binding form,
 after the fashion of dependent
@@ -529,26 +551,52 @@ function types\footnote{Agda does not let you do precisely this, but \LaTeX{} do
 the rest.}.
 \end{definition}
 
-Two commonly occurring degenerate forms merit abbreviation.
+Three commonly occurring variations merit abbreviation.
 %format * = "\mathbin{\D{\times}}"
 %format _*_ = "\D{" _ "\!}" * "\D{\!" _ "}"
+%format :* = "\mathbin{\D{\dot\times}}"
+%format _:*_ = "\D{" _ "\!}" :* "\D{\!" _ "}"
 %format < = "\D{\langle}"
 %format > = "\D{\rangle}"
 %format <_> = < "\D{\!" _ "\!}" >
 \begin{code}
-_*_ : forall {k l} -> Set k -> Set l -> Set (l \-/ k)
+_*_ : {-<-}forall {k l} ->{->-} Set k -> Set l -> Set (l \-/ k)
 S * T = [* _ :: S ]* T
-<_> : forall {k l}{S : Set k}(T : S -> Set l) -> Set (l \-/ k)
-< T > = [* x :: _ ]* T x
+_:*_ : {-<-}forall {k l} ->{->-} {S : Set k}(P Q : S -> Set l) -> (S -> Set l)
+(P :* Q) s = P s * Q s
+<_> : {-<-}forall {k l}{->-} {S : Set k}(P : S -> Set l) -> Set (l \-/ k)
+< P > = [* x :: _ ]* P x
 \end{code}
-The first of these is ordinary non-dependent pairing. The second, prounounced
-`possibly |T|', asserts that a `predicate' (i.e., a function to |Set l|) is
+The first of these is ordinary non-dependent pairing. The second is its
+pointwise lifting to `predicates': |P :* Q| holds whenever |P| holds and |Q| holds.
+The third, prounounced
+`possibly |P|' or `something is |P|',
+asserts that a `predicate' (i.e., a function to |Set l|) is
 somehow satisfied: the domain of the predicate is elided.
+Now we can write |< P :* Q >| for `something is both |P| and |Q|'.
 
-\begin{craft}[Mixfix Operator Sections]
+\begin{craft}[Mixfix Operator Sections, Pattern Synonyms]
 The relation |CTL _ CTM _ CTR _| is given in mixfix form exactly because Agda
 supports operator sections --- |(CTS1 ph ps)|, |(CTS2 th ps)| and |(CTS3 th ph)|
---- which are predicates designed to be used with |<_>|.
+--- which are predicates designed to be used with |<_>|. We can write
+%format th0 = th sb0
+%format th1 = th sb1
+%format ph0 = ph sb0
+%format ph1 = ph sb1
+\[
+  |<(CTS3 th0 ph0) :* (CTS3 th1 ph1)>|
+\]
+to assert the existence of a commuting square. Very often, the existential witness
+is not important. Agda provides the means to elide it:
+%format & = "\C{\dot{,}}\,"
+%format _&_ = "\C{" _ "}" & "\C{" _ "}"
+\begin{code}
+infixr 6 _&_
+pattern _&_ p q = _ , p , q
+\end{code}
+A \emph{pattern synonym} is essentially a macro which can be used on either side
+of the |=| sign: in this case, we ignore the existential witness on the left and
+demand its synthesis on the right.
 \end{craft}
 
 %format -<= = -fake
@@ -627,15 +675,15 @@ For any given inputs |th| and |ph|, there is at most one |ps| and at most one
 \begin{code}
 pattern splatr = r~
 pattern splatrr = r~ , r~
+pattern splatrr,rr = splatrr , splatrr
 \end{code}
 %endif
 %format contraction = "\C{\star}"
 %format splatr = contraction
 %format splatrr = contraction
+%format splatrr,rr = contraction
 %format ~-~ = "\mathbin{\F{\sim\!\!\!\fatsemi\!\!\!\sim}}"
 %format _~-~_ = "\F{" _ "\!}" ~-~ "\F{\!" _ "}"
-%format sb0 = "_{\V{0}}"
-%format sb1 = "_{\V{1}}"
 %format v0 = v sb0
 %format v1 = v sb1
 %format ps0 = ps sb0
@@ -712,7 +760,155 @@ followed by the contraction of chords which do not reach the bottom.
 \end{array}
 \]
 Spatial intuition makes it clear, informally, that identitied are absorbed and that
-composition is associative. We should thus be able to construct a category. But what
+composition is associative. Let us make that intuition formal.
+
+\begin{lemma}[Degenerate Triangles]
+Every thinning |th| induces two degenerate triangles, where |th| and |io| are
+composed, yielding |th|.
+%format io- = "\F{\upiota\fatsemi}"
+%format -io = "\F{\fatsemi\upiota}"
+%format _-io = "\F{" _ "}\!" -io
+%format io~ = "\F{\upiota\fatsemi\!\!\sim}"
+%format ~io = "\F{\sim\!\!\fatsemi\upiota}"
+%format _~io = "\F{" _ "}\!" -io
+%if False
+\begin{code}
+module _ {X : Set} where
+\end{code}
+%endif
+\begin{code}
+  io-   : {-<-}forall {ga de : Bwd X}{->-}  (th : ga <= de) -> (CTri io th th)
+  io- (th -^ x)  = io- th -^ x
+  io- (th -, x)  = io- th -, x
+  io- []         = []
+
+  infixl 30 _-io
+  _-io  : {-<-}forall {ga de : Bwd X}{->-}  (th : ga <= de) -> (CTri th io th)
+  (th -^ x)  -io = th -io -^, x
+  (th -, x)  -io = th -io -, x
+  []         -io = []
+\end{code}
+We may readily extract identity absorption laws in equational form.
+\begin{code}
+  io~   : {-<-}forall {ga de : Bwd X}{->-}  (th : ga <= de) -> io -<= th ~ th
+  io~ th with _ , v <- io <-> th | splatrr <- v ~-~ io- th = splatr
+  _~io  : {-<-}forall {ga de : Bwd X}{->-}  (th : ga <= de) -> th -<= io ~ th
+  th ~io with _ , v <- th <-> io | splatrr <- v ~-~ th -io = splatr
+\end{code}
+\end{lemma}
+
+%format ga0 = ga sb0
+%format ga1 = ga sb1
+%format ga2 = ga sb2
+%format ga3 = ga sb3
+%format th01 = th sb01
+%format th12 = th sb12
+%format th23 = th sb23
+%format th02 = th sb02
+%format th13 = th sb13
+%format th03 = th sb03
+Framing the associativity of composition in terms of triangles gives us a choice.
+When three arrows compose in sequence, they generate three more, together with four
+triangles.
+\[\xymatrix{
+  |ga3| & &       \\
+        & & |ga2| \ar[llu]_{|th23|}\\
+        & &       \\
+        & & |ga1| \ar[uu]_{|th12|} \ar@@{.>}[uuull]_{|th13|} \\
+  |ga0| \ar[rru]_{|th01|}
+        \ar@@{.>}[uuurr]_{|th02|}
+        \ar@@{.>}[uuuu]^{|th03|} & &  \\
+}\]
+Associativity amounts to the assertion that, given any two of the three composite
+arrows, with the two triangles they generate, the whole diagram can be recovered.
+All three results are useful, and they are interderivable, but one must be
+proven by induction --- not on \emph{thinnings} but on \emph{triangles}.
+
+\begin{lemma}[Associativity (03)]
+\[\xymatrix{
+  |ga3| & &       \\
+        & & |ga2| \ar[llu]_{|th23|}\\
+        & &       \\
+        & & |ga1| \ar[uu]_{|th12|} \ar[uuull]_{|th13|} \\
+  |ga0| \ar[rru]_{|th01|}
+        \ar[uuurr]_{|th02|}
+        \ar@@{.>}[uuuu]^{|th03|} & &  \\
+}\]
+%format assoc03 = "\F{assoc03}"
+\begin{code}
+  assoc03 : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{th01 : ga0 <= ga1}{th02 : ga0 <= ga2}{th13 : ga1 <= ga3}{th23 : ga2 <= ga3}  -> {->-}  <(CTS2 th01 th02) :* (CTS1 th23 th13)> 
+           ->                                                                                                                            <(CTS3 th01 th13) :* (CTS3 th02 th23)>
+  assoc03 (v        & w -^ x)   with v' & w' <- assoc03 (v & w)  = v' -^ x   & w' -^ x
+  assoc03 (v -^ x   & w -^, x)  with v' & w' <- assoc03 (v & w)  = v' -^ x   & w' -^, x
+  assoc03 (v -^, x  & w -, x)   with v' & w' <- assoc03 (v & w)  = v' -^, x  & w' -^, x
+  assoc03 (v -, x   & w -, x)   with v' & w' <- assoc03 (v & w)  = v' -, x   & w' -, x
+  assoc03 ([]       & [])                                        = []        & []
+\end{code}
+There are three step cases for an inserted |x|, covering the three stages in the
+sequence where it can have been inserted. There is one step case for a copied |x|,
+which must have be copied in all three stages.
+
+The more familiar equational form of associativity follows by triangulation.
+%format pp = "^{\V{\prime}}"
+%format assoc = "\F{assoc}"
+%format v012 = v sb012
+%format v013 = v sb013
+%format v023 = v sb023
+%format v123 = v sb123
+%format v013' = v013 pp
+%format v023' = v023 pp
+\begin{code}
+  assoc  : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{->-}  (th01 : ga0 <= ga1)(th12 : ga1 <= ga2)(th23 : ga2 <= ga3)
+         ->                                            th01 -<= (th12 -<= th23) ~ (th01 -<= th12) -<= th23
+  assoc th01 th12 th23 with  th13  , v123 <- th12 <-> th23  | th02  , v012 <- th01 <-> th12  |
+                             _     , v013 <- th01 <-> th13  | _     , v023 <- th02 <-> th23  |
+    v013' & v023' <- assoc03 (v012 & v123) | splatrr,rr <- v013 ~-~ v013' , v023 ~-~ v023' = splatr
+\end{code}
+\end{lemma}
+
+We may also derive the other two forms of diagrammatic composition.
+
+\begin{lemma}[Associativity (02, 13)]
+\[\xymatrix{
+  |ga3| & &       \\
+        & & |ga2| \ar[llu]_{|th23|}\\
+        & &       \\
+        & & |ga1| \ar[uu]_{|th12|} \ar[uuull]_{|th13|} \\
+  |ga0| \ar[rru]_{|th01|}
+        \ar@@{.>}[uuurr]_{|th02|}
+        \ar[uuuu]^{|th03|} & &  \\
+}
+\qquad\qquad\qquad
+\xymatrix{
+  |ga3| & &       \\
+        & & |ga2| \ar[llu]_{|th23|}\\
+        & &       \\
+        & & |ga1| \ar[uu]_{|th12|} \ar@@{.>}[uuull]_{|th13|} \\
+  |ga0| \ar[rru]_{|th01|}
+        \ar[uuurr]_{|th02|}
+        \ar[uuuu]^{|th03|} & &  \\
+}\]
+%format assoc02 = "\F{assoc02}"
+%format assoc13 = "\F{assoc13}"
+\begin{code}
+  assoc02 : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{th01 : ga0 <= ga1}{th03 : ga0 <= ga3}{th12 : ga1 <= ga2}{th23 : ga2 <= ga3}  -> {->-}  <(CTS2 th01 th03) :* (CTS3 th12 th23)> 
+           ->                                                                                                                            <(CTS3 th01 th12) :* (CTS1 th23 th03)>
+  assoc02 {th01 = th01}{th12 = th12} (v013 & v123) with th02 , v012 <- th01 <-> th12 |
+    v013' & v023 <- assoc03 (v012 & v123) | splatrr <- v013 ~-~ v013'
+    = v012 & v023
+
+  assoc13 : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{th01 : ga0 <= ga1}{th03 : ga0 <= ga3}{th12 : ga1 <= ga2}{th23 : ga2 <= ga3}  -> {->-}  <(CTS3 th01 th12) :* (CTS1 th23 th03)> 
+           ->                                                                                                                            <(CTS2 th01 th03) :* (CTS3 th12 th23)>
+  assoc13 {th12 = th12}{th23 = th23} (v012 & v023) with th13 , v123 <- th12 <-> th23 |
+    v013 & v023' <- assoc03 (v012 & v123) | splatrr <- v023 ~-~ v023'
+    = v013 & v123
+\end{code}
+That is, we construct the missing arrow and one of the triangles by composition.
+The |assoc03| lemma gives us the other triangle we want and a duplicate of one we
+already have. Contracting the duplication makes the triangles we want fit together.
+\end{lemma}
+
+We should now able to construct a category. But what
 does it mean \emph{in type theory} to construct a category? That is when our troubles
 really begin.
 
@@ -801,16 +997,86 @@ open Setoid
 \end{code}
 \end{definition}
 
-\begin{definition}[Intensional |Setoid|]
+Let us now build some tools to enable the construction of some |Setoid|s that we
+can use to specify arrows in categories and what we expect to be able to prove
+about them.
+
+\begin{definition}[Intensional |Setoid|s]
 Every |Set| gives rise to a |Setoid| whose equivalence is given by |~|.
 %format IN = "\F{\mathrm{IN}}"
 \begin{code}
 IN : {-<-} forall {l} -> {->-} Set l -> Setoid l
 El  (IN X) =   X
 Eq  (IN X) =   _~_
-Rf  (IN X) x                       = splatr
-Sy  (IN X) x  y    splatr          = splatr
-Tr  (IN X) x  y z  splatr  splatr  = splatr
+Rf  (IN X) x               = r~
+Sy  (IN X) x  y    r~      = r~
+Tr  (IN X) x  y z  r~  r~  = r~
+\end{code}
+\end{definition}
+
+\begin{definition}[Comprehension |Setoid|s]
+Fix levels |k| and |l|.
+\begin{code}
+module _ {k l : Level} where
+\end{code}
+From any |Setoid k|, we can construct a further |Setoid| by \emph{proof irrelevant}
+comprehension on its elements with respect to a predicate in |l|.
+%format || = "\F{\parallel}"
+%format _||_ = "\F{" _ "}\!" || "\!\F{" _ "}"
+%format PI = "\F{\mathrm{PI}}"
+%format IM = "\F{\mathrm{IM}}"
+%format SG = "\F{\mathrm{SG}}"
+%format s0 = s sb0
+%format s1 = s sb1
+%format t0 = t sb0
+%format t1 = t sb1
+%format t2 = t sb2
+%format t01 = t sb01
+%format t12 = t sb12
+\begin{code}
+  _||_ : (T : Setoid k)(P : El T -> Set l) -> Setoid (k \-/ l)
+  El  (T || P) = [* x :: El T ]* P x
+  Eq  (T || P) (t0 , _) (t1 , _) = Eq T t0 t1 * One {l}
+  Rf  (T || P) (t , _)                                           = Rf T t , <>
+  Sy  (T || P) (t0 , _) (t1 , _) (t01 , <>)                      = Sy T t0 t1 t01 , <>
+  Tr  (T || P) (t0 , _) (t1 , _) (t2 , _) (t01 , <>) (t12 , <>)  = Tr T t0 t1 t2 t01 t12 , <> 
+\end{code}
+\end{definition}
+
+The |Eq| for comprehensions demands an element of the unit type instead
+of a proof that the proofs of |P| are equal: this is both a vestigial
+marker of some information that has been thrown away, and the means to
+bully Agda into accepting that the |Eq| type is at level |k \-/ l| rather
+than level |k|.
+
+\begin{definition}[Pointwise |Setoid|s]
+Fix a |Set| |S| and a family of |Setoid|s |T|.
+\begin{code}
+module _ {k l}(S : Set k)(T : S -> Setoid l) where
+\end{code}
+We may then construct |Setoid|s which lift |T| pointwise by quantification
+(universal or existential over |S|.
+\begin{code}
+  PI : Setoid (k \-/ l)
+  El  PI     = (s : S) -> El (T s)             -- explicit universal quantification
+  Eq  PI f g = (s : S) -> Eq (T s) (f s) (g s)
+  Rf  PI f s          = Rf (T s) (f s)
+  Sy  PI f g q s      = Sy (T s) (f s) (g s) (q s)
+  Tr  PI f g h p q s  = Tr (T s) (f s) (g s) (h s) (p s) (q s)
+
+  IM : Setoid (k \-/ l)
+  El  IM     = {s : S} -> El (T s)             -- implicit universal quantification
+  Eq  IM f g = (s : S) -> Eq (T s) (f {s}) (g {s})
+  Rf  IM f s          = Rf (T s) f
+  Sy  IM f g q s      = Sy (T s) f g (q s)
+  Tr  IM f g h p q s  = Tr (T s) f g h (p s) (q s)
+
+  SG : Setoid (k \-/ l)
+  El  SG = [* s :: S ]* El (T s)               -- existential quantification
+  Eq  SG (s0 , t0) (s1 , t1) = Sg (s0 ~ s1) \ { r~ -> Eq (T s0) t0 t1 }
+  Rf  SG (s , t)                                               = r~ , Rf (T s) t
+  Sy  SG (s , t0) (.s , t1) (r~ , t01)                         = r~ , Sy (T s) t0 t1 t01
+  Tr  SG (s , t0) (.s , t1) (.s , t2)   (r~ , t01) (r~ , t12)  = r~ , Tr (T s) t0 t1 t2 t01 t12
 \end{code}
 \end{definition}
 
@@ -920,6 +1186,35 @@ Note the inevitable necessity of |coex|, the explicit witness that composition
 respects the weak notion of equivalence given by |~~|: let us ensure that this
 proof is always trivial.
 \end{definition}
+
+As a warm-up, let us construct the category of sets and
+functions-up-to-pointwise-equality.
+
+\begin{definition}[Pointwise Set]
+Every level {l} of the type theoretic hierarchy has a category of sets and
+functions, considered up to pointwise equality. The objects in the category
+are large, but the arrows are small.
+%format SET = "\F{SET}"
+\begin{code}
+module _ (l : Level) where
+  open Cat
+
+  SET : Cat (lsuc l) l
+  Obj  SET = Set l
+  Arr  SET S T = PI S \ _ -> IN T
+  id   SET x      = x
+  _-_  SET f g x  = g (f x)
+  qe (coex SET {f = f} (eq qf) (eq qg)) x  with f x  | qf x
+  ...                                      | _       | r~ = qg _
+  qe (idco SET f)      x = r~
+  qe (coid SET f)      x = r~
+  qe (coco SET f g h)  x = r~
+\end{code}
+\end{definition}
+When giving the extensionality witness for composition, we know only that
+its arguments agree pointwise. Fortunately for us, the definition of
+composition uses its arguments by invoking them at specific points.
+
 
 \begin{code}
 module _ {l}{X : Setoid l} where
