@@ -618,12 +618,17 @@ Now, composition triangles give the graph of a function, and functions are
 deterministic, accordingly, we should be able to recover the fact that the
 inputs determine both the output and the witness.
 
+\begin{lemma}[Uniqueness of Composition Triangles]
+For any given inputs |th| and |ph|, there is at most one |ps| and at most one
+|v| such that |v : (CTri th ph ps)|.
 %if False
 \begin{code}
+pattern splatr = r~
 pattern splatrr = r~ , r~
 \end{code}
 %endif
 %format contraction = "\C{\star}"
+%format splatr = contraction
 %format splatrr = contraction
 %format ~-~ = "\mathbin{\F{\sim\!\!\!\fatsemi\!\!\!\sim}}"
 %format _~-~_ = "\F{" _ "\!}" ~-~ "\F{\!" _ "}"
@@ -637,7 +642,7 @@ pattern splatrr = r~ , r~
 \begin{code}
 infix 10 _~-~_
 _~-~_  : {-<-} forall {X}{ga de ze : Bwd X}{th : ga <= de}{ph : de <= ze}{ps0 ps1 : ga <= ze} -> {->-}  (v0 : (CTri th ph ps0))(v1 : (CTri th ph ps1))
-       ->                                                                                               Sg (ps0 ~ ps1) \ { r~ -> v0 ~ v1 }
+       ->                                                                                               Sg (ps0 ~ ps1) \ { splatr -> v0 ~ v1 }
 v0 -^ x   ~-~ v1 -^ x   with splatrr <- v0 ~-~ v1  = splatrr
 v0 -^, x  ~-~ v1 -^, x  with splatrr <- v0 ~-~ v1  = splatrr
 v0 -, x   ~-~ v1 -, x   with splatrr <- v0 ~-~ v1  = splatrr
@@ -647,13 +652,13 @@ v0 -, x   ~-~ v1 -, x   with splatrr <- v0 ~-~ v1  = splatrr
 \begin{spec}
 infix 10 _~-~_
 _~-~_  : {-<-} forall {X}{ga de ze : Bwd X}{th : ga <= de}{ph : de <= ze}{ps0 ps1 : ga <= ze} -> {->-}  (v0 : (CTri th ph ps0))(v1 : (CTri th ph ps1))
-       ->                                                                                               [* (r~) : ps0 ~ ps1 ]* v0 ~ v1
+       ->                                                                                               [* (splatr) : ps0 ~ ps1 ]* v0 ~ v1
 v0 -^ x   ~-~ v1 -^ x   with splatrr <- v0 ~-~ v1  = splatrr
 v0 -^, x  ~-~ v1 -^, x  with splatrr <- v0 ~-~ v1  = splatrr
 v0 -, x   ~-~ v1 -, x   with splatrr <- v0 ~-~ v1  = splatrr
 []        ~-~ []                                   = splatrr
 \end{spec}
-
+\end{lemma}
 
 \begin{craft}[Dependent Equations]
 The equation |v0 ~ v1| may look ill typed, but it is not. The inlined pattern match
@@ -668,6 +673,107 @@ with |contraction| collapses spaces to a point. Agda does not yet support this
 feature. Here, it abbreviates |r~ , r~|, but it can scale to much larger
 uninteresting types.
 \end{craft}
+
+We have a notion of thinning, closed under identity and composition. I like to
+visualize thinnings as two horizontal sequences of dots. Each dot on the bottom
+ is joined to a dot on top by a vertical chord, but there may be dots on top with no
+chord incident.
+\[\begin{array}{ccccc}
+  \bullet & \bullet & \bullet & \bullet & \bullet \vspace*{-0.17in}\\
+  \mid && \mid && \mid \vspace*{-0.17in}\\
+  \bullet && \bullet && \bullet \\
+\end{array}\]
+The identity thinning has all chords present. Composition is vertical pasting,
+followed by the contraction of chords which do not reach the bottom.
+\[|io| \quad = \quad
+  \begin{array}{ccccc}
+  \bullet & \bullet & \bullet & \bullet & \bullet \vspace*{-0.17in}\\
+  \mid & \mid & \mid & \mid & \mid \vspace*{-0.17in}\\
+  \bullet & \bullet & \bullet & \bullet & \bullet \\
+\end{array}
+\qquad\qquad\qquad\qquad
+\begin{array}{cccccc}
+        &\bullet & \bullet & \bullet & \bullet & \bullet \vspace*{-0.17in}\\
+        &\mid && \mid && \mid \vspace*{-0.17in}\\
+        &\bullet && \bullet && \bullet \vspace*{-0.17in}\\
+  |-<=| &\mid &&&& \mid  \vspace*{-0.17in}\\
+        &\bullet &&&& \bullet
+\end{array}
+\quad = \quad
+\begin{array}{ccccc}
+  \bullet & \bullet & \bullet & \bullet & \bullet \vspace*{-0.17in}\\
+  \mid &&  && \mid \vspace*{-0.17in}\\
+  \mid &&  && \mid \vspace*{-0.17in}\\
+  \mid &&&& \mid  \vspace*{-0.17in}\\
+  \bullet &&&& \bullet
+\end{array}
+\]
+Spatial intuition makes it clear, informally, that identitied are absorbed and that
+composition is associative. We should thus be able to construct a category. But what
+does it mean \emph{in type theory} to construct a category? That is when our troubles
+really begin.
+
+
+\section{Type Theorists Worry About Equality}
+
+An ingenue (or very sophisticated troll) once wrote to some mathematical mailing list
+asking whether category theory and type theory were the same. Some category theorists
+answered vaguely in the positive, at which point the type theorists accused them of
+insufficiently interrogating the meaning of `the same'. The title of this section is
+tantamount to a definition of the discipline, especially if you come from the school
+which takes the classification of a thing to be the diagonal of the classified
+partial equivalence relation which says when two things are the same.
+
+Informally, a category is given by
+\begin{enumerate}
+\item some notion of \emph{objects};
+\item for every pair of objects, \emph{source} and \emph{target},
+  some notion of \emph{arrows} from source to target;
+\item for each object, an \emph{identity} arrow from that object to itself;
+\item for each pair of arrows which meet in the middle, a \emph{composite} arrow from
+  the source of the first to the target of the second;
+\item ensuring that composition absorbs identity and associates, i.e., that some
+  equations between arrows hold.
+\end{enumerate}
+
+For thinnings, our objects are scopes and |<=| tells us what the arrows are. We have
+candidates for identity and composition. We can take the same view of types and
+functions: |Set| gives our objects, |->| our arrows, and we have the identity function
+and function composition.
+
+But any type theorist will ask, or rather will \emph{be asked} by their equipment,
+`What is the status of equations between arrows?'. For thinnings, which are first
+order inductive data structures (indeed, bit vectors), the intensional |~| should
+suffice; for functions, |~| is dangerously restrictive, identifying only functions
+with the same \emph{implementation}, up to definitional equality. Any workable
+notion of category within type theory has to negotiate this distinction, which is
+waved away in everyday mathematical practice.
+
+We have three options:
+
+\begin{enumerate}
+\item \emph{Worry About Equality.}~ Work to replace intensional |~| by something which
+  better reflects mathematical intuition. That is the work of many lifetimes,
+  mine included, and it is beginning to pay off. Observational Type Theory gave
+  a good answer to when values are equal, but not such a good answer to when types are
+  equal. (It was never the basis of a usable implementation, a fact for which I
+  bear some blame.) Homotopy Type Theory gives a better answer, and in its Cubical
+  variant, is beginning to materialise. This is the best option, if you have
+  patience.
+\item \emph{Tell Lies.}~ Postulate that |~| has the properties we wish it had, e.g.
+  that pointwise equal functions are equal. Get on with exploring the important ideas.
+  Unfortunately, the computational properties of postulates frustrate the execution of
+  actual, if sophisticated, programs when proofs of equations are used to transport
+  actual values between merely provably equal types. None the less, this is the best
+  option, if you have undergraduates.
+\item \emph{Tell Weaker Truths.}~ Arrange to work up to |~| when you
+  can (e.g., with thinnings) and to weaker notions (e.g., pointwise equality for
+  functions) when you cannot. This is the best option, if you are in a hurry.
+\end{enumerate}
+
+My head is with option 1, my heart is with option 2, but my entire digestive system is
+with option 3, so that is how I shall proceed in this paper.
+
 
 \bibliographystyle{plain}
 \bibliography{EGTBS}
