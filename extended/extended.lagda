@@ -5,17 +5,20 @@
 \usepackage[T1]{fontenc}
 \usepackage{amsmath}
 \usepackage{hyperref}
-\usepackage{xypic}
 
 \usepackage{tikz}
 \usepackage{lipsum}
-\usepackage{pig}
+
 \usepackage{upgreek}
+\usepackage{xypic}
+
+\usepackage{pig}
 \ColourEpigram
 \newcommand{\D}[1]{\blue{\ensuremath{\mathsf{#1}}}}
 \newcommand{\C}[1]{\red{\ensuremath{\mathsf{#1}}}}
 \newcommand{\F}[1]{\green{\ensuremath{\mathsf{#1}}}}
 \newcommand{\V}[1]{\purple{\ensuremath{\mathit{#1}}}}
+\newcommand{\M}[1]{\black{\ensuremath{\mathrm{#1}}}}
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{craft}[theorem]{Craft}
@@ -43,7 +46,7 @@ open import Agda.Primitive renaming (_⊔_ to _\-/_)
 \end{code}
 %endif
 
-%format \-/ = "\mathbin{\F{\sqcup}}"
+%format \-/ = "\mathbin{\D{\sqcup}}"
 
 \begin{document}
 
@@ -369,7 +372,7 @@ In Agda, we may give an inductive definition of equality,
 as follows:
 \begin{code}
 infix 5 _~_
-data _~_ {l}{X : Set l}(x : X) : X -> Set where
+data _~_ {l}{X : Set l}(x : X) : X -> Set l where
   r~ : x ~ x
 \end{code}
 The |l| parameter is an arbitrary \emph{level} in the
@@ -514,9 +517,8 @@ infixr 5 _,_
 
 record Sg {k l}(S : Set k)(T : S -> Set l) : Set (l \-/ k) where
   constructor _,_
-  field
-    fst  : S
-    snd  : T fst
+  field  fst  : S
+         snd  : T fst
 open Sg public     -- brings the projections into scope
 
 syntax Sg S (\ x -> T) = [* x :: S ]* T
@@ -667,12 +669,13 @@ convenient way to specify `telescopic' equations.
 \end{craft}
 
 \begin{craft}[Contraction Pattern, |contraction|]
-In typeset code, I write |contraction| instead of unique patterna which can be
-constructed by record expansion followed by one step of case analysis. Matching
-with |contraction| collapses spaces to a point. Agda does not yet support this
-feature. Here, it abbreviates |r~ , r~|, but it can scale to much larger
-uninteresting types.
-\end{craft}
+In typeset code, I
+write |contraction| instead of unique patterns which can be
+constructed by record expansion followed by at most one step of case
+analysis for each field. Matching with |contraction| collapses spaces
+to a point. Agda does not yet support this feature. Here, it
+abbreviates |r~ , r~|, but it can scale to much larger uninteresting
+types.  \end{craft}
 
 We have a notion of thinning, closed under identity and composition. I like to
 visualize thinnings as two horizontal sequences of dots. Each dot on the bottom
@@ -774,6 +777,172 @@ We have three options:
 My head is with option 1, my heart is with option 2, but my entire digestive system is
 with option 3, so that is how I shall proceed in this paper.
 
+The plan, which is far from original, is to work with setoids of arrows,
+carefully managing the appropriate notion of equivalence on a case-by-case basis.
+A \emph{setoid} is a set equipped with an \emph{arbitrary} equivalence relation.
+
+%format Setoid = "\D{Setoid}"
+%format El = "\F{El}"
+%format Eq = "\F{Eq}"
+%format Rf = "\F{Rf}"
+%format Sy = "\F{Sy}"
+%format Tr = "\F{Tr}"
+%format lsuc = "\D{lsuc}"
+\begin{definition}[Setoid]
+Every level of the hierarchy is equipped with a notion of |Setoid|.
+\begin{code}
+record Setoid l : Set (lsuc l) where
+  field  El  :  Set l                                         -- |El|ements
+         Eq  :  El -> El -> Set l                             -- |Eq|uivalence
+         Rf  :  (x : El)      -> Eq x x                       -- \F{R}e\F{f}lexivity
+         Sy  :  (x y : El)    -> Eq x y -> Eq y x             -- |Sy|mmetry
+         Tr  :  (x y z : El)  -> Eq x y -> Eq y z -> Eq x z   -- |Tr|ansitivity
+open Setoid
+\end{code}
+\end{definition}
+
+\begin{definition}[Intensional |Setoid|]
+Every |Set| gives rise to a |Setoid| whose equivalence is given by |~|.
+%format IN = "\F{\mathrm{IN}}"
+\begin{code}
+IN : {-<-} forall {l} -> {->-} Set l -> Setoid l
+El  (IN X) =   X
+Eq  (IN X) =   _~_
+Rf  (IN X) x                       = splatr
+Sy  (IN X) x  y    splatr          = splatr
+Tr  (IN X) x  y z  splatr  splatr  = splatr
+\end{code}
+\end{definition}
+
+\begin{craft}[Green Things in Blue Packaging]
+I anticipate that we shall need to construct explanations which look like
+equational proofs, but are constructed within the equivalence of a known
+|Setoid|. I therefore introduce a type constructor whose entire purpose is
+to fix the |Setoid| at work. There is no general way to infer the setoid
+|X| from a type which is known to be |Eq X x y|, so the craft lies in ensuring
+that we never forget which |Setoid| we work in.
+%
+%format :> = "\mathrel{\D{\ni}}"
+%format ~~ = "\mathrel{\D{\approx}}"
+%format _:>_~~_ = "\D{" _ "}\!" :> "\!\D{" _ "}\!" ~~ "\!\D{" _ "}"
+%format eq = "\C{eq}"
+%format qe = "\F{qe}"
+%format ~[ = "\F{\approx\!\!\![}"
+%format >~ = "\F{\rangle\!\!\!\approx}"
+%format ~< = "\F{\approx\!\!\!\langle}"
+%format ]~ = "\F{]\!\!\!\approx}"
+%format [SQED] = "\F{\square}"
+%format RfX = "\F{RfX}"
+%format SyX = "\F{SyX}"
+%format TrX = "\F{TrX}"
+%format _~[_>~_ = _ ~[ _ >~ _
+%format _~<_]~_ = _ ~< _ ]~ _
+%format _[SQED] = _ [SQED]
+%format rS = "\F{r\!\!\approx}"
+%format qprf = "\F{qprf}"
+%
+\begin{code}
+record _:>_~~_ {l}(X : Setoid l)(x y : El X) : Set l where
+  constructor  eq
+  field        qe : Eq X x y
+open _:>_~~_ public
+\end{code}
+When we formulate categorical laws, we shall use this wrapped version.
+\end{craft}
+
+At last, we are ready to say what a category might be.
+
+
+\section{Categories, Type Theoretically}
+
+What follows is far from perfect. The best that can be said is that it is an
+effective pragmatic compromise. Neither is it an unusual recipe. I labour the
+point only to teach the craft of the cooking.
+
+A category will have a |Set| of objects and, indexed by source and target objects,
+a |Setoid| of arrows.
+
+But there's another catch: type theoretic level. There is no
+good reason to believe that the level objects live on is in any way related to the
+the level that arrows live on. Agda is particularly bad at supporting
+\emph{cumulativity} --- implicit upward flow between levels --- and by `bad', I mean
+it just does not. (Coq by contrast, is rather good at it.) Agda forces one to use
+level polymorphism instead of cumulativity. The two are poor stablemates, but they
+have backed the wrong horse. In the now, the pragmatic policy is to keep the levels
+of objects and arrows separate.
+
+%format Level = "\D{Level}"
+%format Cat = "\D{Cat}"
+%format Obj = "\F{Obj}"
+%format Arr = "\F{Arr}"
+%format ~> = "\F{\vartriangleright\!}"
+%format _~>_ = "\F{" _ "\!}" ~> "\F{\!" _ "}"
+%format _~~_ = "\D{" _ "\!}" ~~ "\D{\!" _ "}"
+%format id = "\F{\upiota}"
+%format - = "\F{\fatsemi}"
+%format _-_ = "\F{" _ "\!}" - "\F{\!" _ "}"
+%format coex = "\F{coex}"
+%format idco = "\F{idco}"
+%format coid = "\F{coid}"
+%format coco = "\F{coco}"
+\begin{definition}[|Cat|egory]
+Fix |k|, the level of objects, and |l|, the level of arrows.
+%if False
+\begin{code}
+module _ (k l : Level) where  -- fix |k|, the level of objects,
+                              -- and |l|, the level of arrows
+\end{code}
+%endif
+
+We may then define a notion of |Cat|egory.
+\begin{code}
+  record Cat : Set (lsuc (k \-/ l)) where
+    -- We have a |Set| of |Obj|ects, and a family of |Setoid|s of |Arr|ows.
+    field      Obj   :  Set k
+               Arr   :  Obj -> Obj -> Setoid l
+               -- Agda allows one to pause between |field|s to make \emph{definitions}\ldots
+    _~>_ : Obj -> Obj -> Set l
+    S ~> T = El (Arr S T)
+               -- \ldots and then resume requesting |field|s.
+    -- We have identity and composition.
+    field      id    :  {-<-}{T : Obj} -> {->-}      T ~> T
+               _-_   :  {-<-}{R S T : Obj} -> {->-}  R ~> S -> S ~> T -> R ~> T
+    -- Locally define equality of arrows\ldots
+    _~~_ : {S T : Obj}(f g : S ~> T) -> Set l
+    _~~_ {S}{T} f g = Arr S T :> f ~~ g
+    -- \ldots then require the laws.
+    field      coex  :  {-<-}{R S T : Obj}{f f' : R ~> S}{g g' : S ~> T} -> {->-}  f ~~ f' -> g ~~ g' -> (f - g) ~~ (f' - g')
+               idco  :  {-<-}{S T : Obj}{->-}(f : S ~> T) ->                              (id - f)       ~~  f
+               coid  :  {-<-}{S T : Obj}{->-}(f : S ~> T) ->                              (f - id)       ~~  f
+               coco  :  {-<-}{R S T U : Obj}{->-}(f : R ~> S)(g : S ~> T)(h : T ~> U) ->  (f - (g - h))  ~~  ((f - g) - h)
+\end{code}
+Note the inevitable necessity of |coex|, the explicit witness that composition
+respects the weak notion of equivalence given by |~~|: let us ensure that this
+proof is always trivial.
+\end{definition}
+
+\begin{code}
+module _ {l}{X : Setoid l} where
+  private RfX = Rf X ; SyX = Sy X ; TrX = Tr X
+
+  infixr 5 _~[_>~_ _~<_]~_
+  infixr 6 _[SQED]
+
+  _~[_>~_ : {-<-} {y z : El X} -> {->-} forall x -> X :> x ~~ y -> X :> y ~~ z -> X :> x ~~ z
+  x ~[ eq q >~ eq q' = eq (TrX _ _ _ q q')
+  
+  _~<_]~_ : {-<-} {y z : El X} -> {->-} forall x -> X :> y ~~ x -> X :> y ~~ z -> X :> x ~~ z
+  x ~< eq q ]~ eq q' = eq (TrX _ _ _ (SyX _ _ q) q')
+
+  _[SQED] : (x : El X) -> X :> x ~~ x
+  x [SQED] = eq (RfX x)
+  
+  rS : {-<-} forall {x : El X} -> {->-}  X :> x ~~ x
+  rS {x} = eq (RfX x)
+
+qprf : {-<-} forall {l} -> {->-} (X : Setoid l){x y : El X} -> X :> x ~~ y -> Eq X x y
+qprf X = qe
+\end{code}
 
 \bibliographystyle{plain}
 \bibliography{EGTBS}
