@@ -180,6 +180,7 @@ reflectional symmetry and have modest pictographic value.
 Typed de Bruijn indices select \emph{one} entry from a context.
 %format <<- = "\mathrel{\D{\shortleftarrow}}"
 %format _<<-_ = "\D{" _ "\!}" <<- "\D{\!" _ "}"
+%format <<-_ = <<- "\D{\!" _ "}"
 %format _<<- = "\D{" _ "\!}" <<-
 %format ze = "\C{ze}"
 %format su = "\C{su}"
@@ -211,7 +212,7 @@ recursive substructures. If they do so vary, we call them \emph{uniform}
 indices. Only if they remain constant throughout should we refer to
 them as \emph{parameters}. So, |ta|, above is a parameter, but |Ga|, below
 is a uniform index. The distinction impacts the category in which an
-initial object is being constructed. |(ta <-_)| is constructed in
+initial object is being constructed. |(ta <<-_)| is constructed in
 |Context -> Set|, while |_!!-_| is constructed in
 |Context -> Type -> Set|. Meanwhile, right of |:| come those things
 which may be restricted to particular patterns of value in the return
