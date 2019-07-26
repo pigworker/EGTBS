@@ -908,8 +908,8 @@ The |assoc03| lemma gives us the other triangle we want and a duplicate of one w
 already have. Contracting the duplication makes the triangles we want fit together.
 \end{lemma}
 
-We should now able to construct a category. But what
-does it mean \emph{in type theory} to construct a category? That is when our troubles
+We should now able to construct the category of thinnings, if only we knew
+what it might mean to construct a category \emph{in type theory}. That is when our troubles
 really begin.
 
 
@@ -1214,6 +1214,36 @@ module _ (l : Level) where
 When giving the extensionality witness for composition, we know only that
 its arguments agree pointwise. Fortunately for us, the definition of
 composition uses its arguments by invoking them at specific points.
+
+\begin{definition}[Discrete Category]
+Every |Set| induces a \emph{discrete category} with its elements for objects
+and only identity arrows, given by intensional equality.
+%format DISCRETE = "\F{DISCRETE}"
+%format splatvr = contraction
+%format splateqrv = contraction
+%if False
+\begin{code}
+pattern splatvr = <> , r~
+pattern splateqrv = eq (r~ , <>)
+module _ {l : Level} where
+  open Cat
+\end{code}
+%endif
+\begin{code}
+  DISCRETE : (X : Set l) -> Cat l l
+  Obj   (DISCRETE X)                          = X
+  Arr   (DISCRETE X) x y                      = IN (One {l}) || \ _ -> x ~ y
+  id    (DISCRETE X)                          = splatvr
+  _-_   (DISCRETE X) splatvr splatvr          = splatvr
+  coex  (DISCRETE X) splateqrv splateqrv      = splateqrv
+  idco  (DISCRETE X) splatvr                  = splateqrv
+  coid  (DISCRETE X) splatvr                  = splateqrv
+  coco  (DISCRETE X) splatvr splatvr splatvr  = splateqrv
+\end{code}
+I make the arrows carry \emph{trivial} information, subject to the \emph{condition}
+that source and target are equal. I am therefore not obliged to reason about
+equality between equality proofs.
+\end{definition}
 
 
 \begin{code}
