@@ -984,7 +984,7 @@ A \emph{setoid} is a set equipped with an \emph{arbitrary} equivalence relation.
 %format Rf = "\F{Rf}"
 %format Sy = "\F{Sy}"
 %format Tr = "\F{Tr}"
-%format lsuc = "\D{lsuc}"
+%format lsuc = "\D{1+}"
 \begin{definition}[Setoid]
 Every level of the hierarchy is equipped with a notion of |Setoid|.
 \begin{code}
@@ -1222,10 +1222,12 @@ and only identity arrows, given by intensional equality.
 %format DISCRETE = "\F{DISCRETE}"
 %format splatvr = contraction
 %format splateqrv = contraction
+%format splateqr = contraction
 %if False
 \begin{code}
 pattern splatvr = <> , r~
 pattern splateqrv = eq (r~ , <>)
+pattern splateqr = eq r~
 module _ {l : Level} where
   open Cat
 \end{code}
@@ -1246,6 +1248,32 @@ that source and target are equal. I am therefore not obliged to reason about
 equality between equality proofs.
 \end{definition}
 
+Finally, in this section, let us assemble the jigsaw pieces which make up the
+category of thinnings.
+
+\begin{lemma}[Category of Thinnings]
+Thinnings form the arrows of a category.
+%format THIN = "\F{THIN}"
+%format lzero = "\D{0}"
+%if False
+\begin{code}
+module _ where
+  open Cat
+\end{code}
+%endif
+
+\begin{code}
+  THIN : Set -> Cat lzero lzero
+  Obj   (THIN X)                     = Bwd X
+  Arr   (THIN X) ga de               = IN (ga <= de)
+  id    (THIN X)                     = io
+  _-_   (THIN X)                     = _-<=_
+  coex  (THIN X) splateqr splateqr   = splateqr
+  idco  (THIN X) th                  = eq (io~ th)
+  coid  (THIN X) th                  = eq (th ~io)
+  coco  (THIN X) th ph ps            = eq (assoc th ph ps)
+\end{code}
+\end{lemma}
 
 \begin{code}
 module _ {l}{X : Setoid l} where
