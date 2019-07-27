@@ -182,25 +182,32 @@ Typed de Bruijn indices select \emph{one} entry from a context.
 %format _<<-_ = "\D{" _ "\!}" <<- "\D{\!" _ "}"
 %format <<-_ = <<- "\D{\!" _ "}"
 %format _<<- = "\D{" _ "\!}" <<-
+%format <<1- = "\mathrel{\D{\shortleftarrow}}"
+%format _<<1-_ = "\D{" _ "\!}" <<1- "\D{\!" _ "}"
+%format <<1-_ = <<1- "\D{\!" _ "}"
+%format _<<1- = "\D{" _ "\!}" <<1-
 %format ze = "\C{ze}"
 %format su = "\C{su}"
 %format Ga = "\V{\Gamma}"
 %format De = "\V{\Delta}"
 %format sg = "\V{\sigma}"
 %format ta = "\V{\tau}"
+%format !!1- = "\mathrel{\D{\vdash}}"
+%format _!!1-_ = "\D{" _ "\!}" !!1- "\D{\!" _ "}"
+%format !!1-_ = !!1- "\D{\!" _ "}"
 %format !!- = "\mathrel{\D{\vdash}}"
 %format _!!-_ = "\D{" _ "\!}" !!- "\D{\!" _ "}"
-%format !!-_ = !!- "\D{\!" _ "}"
+%format !!-_ = !!1- "\D{\!" _ "}"
 %format va = "\C{va}"
 %format ap = "\C{ap}"
 %format la = "\C{la}"
 \begin{code}
-infix 10 _<<-_
+infix 10 _<<1-_
 
-data _<<-_ (ta : Type) : Context -> Set where
-  ze  : {-<-} forall {Ga} -> {->-}     ta <<- Ga -, ta
-  su  : {-<-} forall {Ga sg} -> {->-}  ta <<- Ga
-      ->                               ta <<- Ga -, sg
+data _<<1-_ (ta : Type) : Context -> Set where
+  ze  : {-<-} forall {Ga} -> {->-}     ta <<1- Ga -, ta
+  su  : {-<-} forall {Ga sg} -> {->-}  ta <<1- Ga
+      ->                               ta <<1- Ga -, sg
 \end{code}
 
 \begin{craft}[Parameters, Uniform Indices, Restrictable Indices]
@@ -212,8 +219,8 @@ recursive substructures. If they do so vary, we call them \emph{uniform}
 indices. Only if they remain constant throughout should we refer to
 them as \emph{parameters}. So, |ta|, above is a parameter, but |Ga|, below
 is a uniform index. The distinction impacts the category in which an
-initial object is being constructed. |(ta <<-_)| is constructed in
-|Context -> Set|, while |_!!-_| is constructed in
+initial object is being constructed. |(ta <<1-_)| is constructed in
+|Context -> Set|, while |_!!1-_| is constructed in
 |Context -> Type -> Set|. Meanwhile, right of |:| come those things
 which may be restricted to particular patterns of value in the return
 types of value constructors, e.g., \emph{nonempty} contexts above,
@@ -224,19 +231,19 @@ The type of terms reflect the typing rules, indexed by a context and
 the type being inhabited.
 
 \begin{code}
-infix 10 _!!-_
+infix 10 _!!1-_
 
-data _!!-_ (Ga : Context) : Type -> Set where
+data _!!1-_ (Ga : Context) : Type -> Set where
 
-  va  : {-<-} forall {ta} -> {->-}     ta <<- Ga
-      ->                               Ga !!- ta
+  va  : {-<-} forall {ta} -> {->-}     ta <<1- Ga
+      ->                               Ga !!1- ta
 
-  ap  : {-<-} forall {sg ta} -> {->-}  Ga !!- sg ->> ta
-      ->                               Ga !!- sg
-      ->                               Ga !!- ta
+  ap  : {-<-} forall {sg ta} -> {->-}  Ga !!1- sg ->> ta
+      ->                               Ga !!1- sg
+      ->                               Ga !!1- ta
 
-  la  : {-<-} forall {sg ta} -> {->-}  Ga -, sg !!- ta
-      ->                               Ga !!- sg ->> ta
+  la  : {-<-} forall {sg ta} -> {->-}  Ga -, sg !!1- ta
+      ->                               Ga !!1- sg ->> ta
 \end{code}
 
 Observe that the context we are handed at the root of a term only ever gets
@@ -245,9 +252,9 @@ choose one thing from the context and disregard the rest.
 
 Now, a \emph{simultaneous substitution} is a type-respecting mapping from
 variables in some source context |Ga| to terms over target context |De| ---
-from |(_<<- Ga)| to |(De !!-_)|, if you will. When we push such a thing
+from |(_<<1- Ga)| to |(De !!1-_)|, if you will. When we push such a thing
 under |la|, we need instead a mapping from
-|(_<<- Ga -, sg)| to |(De -, sg !!-_)|. We can map the newly bound |ze| to
+|(_<<1- Ga -, sg)| to |(De -, sg !!1-_)|. We can map the newly bound |ze| to
 |va ze|, but the trouble is that all of |Ga|'s variables are mapped to terms
 over |De|, not |De -, sg|. It is thus necessary to traverse all those terms
 and adjust their leaves, because it is only at the leaves that we document
@@ -374,6 +381,39 @@ fore-thinning, and definitional equality loses power.
 The reader should note that I will shortly substitute a subtly different
 definition of composition for this one. Rest assured that its replacement
 will satisfy the above equations.
+
+Before we move on, though, observe that our type of de Bruijn variables,
+|ta <<1- Ga| can readily be expressed as the \emph{singleton} thinning,
+|[] -, ta <= Ga|. Let us therefore refactor our previous definitions:
+
+\begin{definition}[Singleton Thinning]
+Element selection is given by thinning from a singleton source
+\begin{code}
+_<<-_ : {-<-}forall {X} ->{->-} X -> Bwd X -> Set
+x <<- ga = [] -, x <= ga
+\end{code}
+%if False
+\begin{code}
+infix 10 _!!-_
+
+data _!!-_ (Ga : Context) : Type -> Set where
+
+  va  : {-<-} forall {ta} -> {->-}     ta <<- Ga
+      ->                               Ga !!- ta
+
+  ap  : {-<-} forall {sg ta} -> {->-}  Ga !!- sg ->> ta
+      ->                               Ga !!- sg
+      ->                               Ga !!- ta
+
+  la  : {-<-} forall {sg ta} -> {->-}  Ga -, sg !!- ta
+      ->                               Ga !!- sg ->> ta
+\end{code}
+%endif
+\end{definition}
+
+It is now immediately clear why thinnings have a sensible action on
+de Bruijn terms --- thinnings act on de Bruijn variables
+\emph{by composition}.
 
 
 \section{When `Green Slime' is Bad, Avoid It}
@@ -561,6 +601,7 @@ Three commonly occurring variations merit abbreviation.
 %format > = "\D{\rangle}"
 %format <_> = < "\D{\!" _ "\!}" >
 \begin{code}
+infixr 4 _*_
 _*_ : {-<-}forall {k l} ->{->-} Set k -> Set l -> Set (l \-/ k)
 S * T = [* _ :: S ]* T
 _:*_ : {-<-}forall {k l} ->{->-} {S : Set k}(P Q : S -> Set l) -> (S -> Set l)
@@ -1098,13 +1139,13 @@ that we never forget which |Setoid| we work in.
 %format >~ = "\F{\rangle\!\!\!\approx}"
 %format ~< = "\F{\approx\!\!\!\langle}"
 %format ]~ = "\F{]\!\!\!\approx}"
-%format [SQED] = "\F{\square}"
+%format ~[SQED] = "\F{\square}"
 %format RfX = "\F{RfX}"
 %format SyX = "\F{SyX}"
 %format TrX = "\F{TrX}"
 %format _~[_>~_ = _ ~[ _ >~ _
 %format _~<_]~_ = _ ~< _ ]~ _
-%format _[SQED] = _ [SQED]
+%format _~[SQED] = _ ~[SQED]
 %format rS = "\F{r\!\!\approx}"
 %format qprf = "\F{qprf}"
 %
@@ -1248,6 +1289,52 @@ that source and target are equal. I am therefore not obliged to reason about
 equality between equality proofs.
 \end{definition}
 
+%format OP = "\F{OP}"
+%format Cdot = "\V{C}."
+%format C.Obj = Cdot Obj
+%format C.Arr = Cdot Arr
+%format C.id = Cdot id
+%format C.- = Cdot -
+%format C.~> = Cdot ~>
+%format C.~~ = Cdot ~~
+%format C._-_ = Cdot _-_
+%format C.coex = Cdot coex
+%format C.idco = Cdot idco
+%format C.coid = Cdot coid
+%format C.coco = Cdot coco
+\begin{definition}[Opposite Category]
+Fix a category |C|. (The following declaration allows us to refer to its
+components as |C.Obj|, and so on.)
+\begin{code}
+module _ {k l}(C : Cat k l)where
+  private module C = Cat C
+\end{code}
+%if False
+\begin{code}
+  open Cat
+\end{code}
+%endif
+We construct |OP|, whose objects are those of |C| but whose arrows are reversed,
+as follows:
+\begin{code}
+  OP : Cat k l
+  Obj   OP        = C.Obj
+  Arr   OP S T    = C.Arr T S
+  id    OP        = C.id
+  _-_   OP f g    = g C.- f
+  coex  OP qf qg  = C.coex qg qf
+  idco  OP        = C.coid
+  coid  OP        = C.idco
+  coco  OP f g h  = eq (Sy (C.Arr _ _) _ _ (qe (C.coco h g f)))
+\end{code}
+Identities are preserved but composition is flipped. Correspondingly, the
+witness to extensionality of composition also flips and the identity absorption
+proofs swap over. Associativity of composition relies essentially on the symmetry
+of setoid equivalence for the arrows of |C|.
+
+Outside our module, we may now write |OP C| for the opposite category of |C|.
+\end{definition}
+
 Finally, in this section, let us assemble the jigsaw pieces which make up the
 category of thinnings.
 
@@ -1275,12 +1362,101 @@ module _ where
 \end{code}
 \end{lemma}
 
+Now, the crucial structure that we exploit in codeBruijn programming arises
+from the relationship between the discrete category on scopes and the category
+of thinnings. That relationship requires us to consider `arrows between categories',
+i.e., \emph{functors}.
+
+
+\section{Functors as Arrows, Functors as Objects}
+
+When does one category tell you about another? When we have a
+structure-preserving translation --- a \emph{functor} --- between
+them: maps of cities are useful in part because the lines on the map
+join up in the same pattern as the streets in the city. What is a functor, in our
+setting?
+
+%format Ddot = "\V{D}."
+%format D.Obj = Ddot Obj
+%format D.Arr = Ddot Arr
+%format D.id = Ddot id
+%format D.- = Ddot -
+%format D.~> = Ddot ~>
+%format D.~~ = Ddot ~~
+%format D._-_ = Ddot _-_
+%format D.coex = Ddot coex
+%format D.idco = Ddot idco
+%format D.coid = Ddot coid
+%format D.coco = Ddot coco
+%format Edot = "\V{E}."
+%format E.Obj = Edot Obj
+%format E.Arr = Edot Arr
+%format E.id = Edot id
+%format E.- = Edot -
+%format E.~> = Edot ~>
+%format E.~~ = Edot ~~
+%format E._-_ = Edot _-_
+%format E.coex = Edot coex
+%format E.idco = Edot idco
+%format E.coid = Edot coid
+%format E.coco = Edot coco
+%format Functor = "\F{Functor}"
+
+\begin{definition}[Functor]
+Fix a \emph{source} category |C| and a \emph{target} category |D|. Their relative
+sizes are unimportant.
+\begin{code}
+module _ {l k l' k'}(C : Cat l k)(D : Cat l' k') where
+  private module C = Cat C ; module D = Cat D
+\end{code}
+We may construct a |Setoid| of structure-preserving translations from |C| to |D|.
+Every |C| object must |Map| to a |D| object, and every |C| arrow must |map| to
+a |D| arrow, compatibly with |Map|.
+\begin{code}
+  Functor : Setoid (l \-/ k \-/ l' \-/ k')
+  Functor =
+    SG (C.Obj -> D.Obj) \ Map -> 
+    (  IM C.Obj \ S -> IM C.Obj \ T -> PI (S C.~> T) \ _ ->
+                 D.Arr (Map S) (Map T))
+    ||  \ map ->
+\end{code}
+The use of a comprehension allows us to add the laws that |map| must obey:
+it must respect equivalence, and preserve identities and composition.
+\begin{code}
+        ({S T : C.Obj}{f g : S C.~> T} ->
+            f C.~~ g -> map f D.~~ map g)
+    *   ({X : C.Obj} ->
+            map (C.id {X}) D.~~ D.id {Map X})
+    *   ({R S T : C.Obj}(f : R C.~> S)(g : S C.~> T) ->
+            map (f C.- g) D.~~ (map f D.- map g))
+\end{code}
+\end{definition}
+
+
+Before we can go to work with this definition, we should tool up for the reasoning
+within setoids that we shall inevitably face.
+
+\begin{craft}[Equivalence Reasoning for Setoids]
+Fix a |Setoid|, |X|, and name its laws.
 \begin{code}
 module _ {l}{X : Setoid l} where
   private RfX = Rf X ; SyX = Sy X ; TrX = Tr X
+\end{code}
 
+We may benefit from `green things in blue packaging' by suppressing more detail
+when the setoid at work is fixed. E.g., we can drop the element from the
+reflexivity witness.
+\begin{code}  
+  rS : {-<-} forall {x : El X} -> {->-}  X :> x ~~ x
+  rS {x} = eq (RfX x)
+\end{code}
+
+Moreover, we can build some combinators which facilitate readable chains of
+equational reasoning, showing the steps and the explanations which justify
+them.
+\begin{code}
   infixr 5 _~[_>~_ _~<_]~_
-  infixr 6 _[SQED]
+  infixr 6 _~[SQED]
 
   _~[_>~_ : {-<-} {y z : El X} -> {->-} forall x -> X :> x ~~ y -> X :> y ~~ z -> X :> x ~~ z
   x ~[ eq q >~ eq q' = eq (TrX _ _ _ q q')
@@ -1288,15 +1464,114 @@ module _ {l}{X : Setoid l} where
   _~<_]~_ : {-<-} {y z : El X} -> {->-} forall x -> X :> y ~~ x -> X :> y ~~ z -> X :> x ~~ z
   x ~< eq q ]~ eq q' = eq (TrX _ _ _ (SyX _ _ q) q')
 
-  _[SQED] : (x : El X) -> X :> x ~~ x
-  x [SQED] = eq (RfX x)
-  
-  rS : {-<-} forall {x : El X} -> {->-}  X :> x ~~ x
-  rS {x} = eq (RfX x)
+  _~[SQED] : (x : El X) -> X :> x ~~ x
+  x ~[SQED] = eq (RfX x)
+\end{code}
 
+Lastly, we have a combinator which allows us to fix the setoid.
+\begin{code}
 qprf : {-<-} forall {l} -> {->-} (X : Setoid l){x y : El X} -> X :> x ~~ y -> Eq X x y
 qprf X = qe
 \end{code}
+\end{craft}
+
+Let us have some examples.
+
+\begin{definition}[Forgetting Arrows]
+Fix a category
+\begin{code}
+module _ {k l}(C : Cat k l) where
+  private module C = Cat C
+\end{code}
+The discrete category on the objects of |C| has a functor into |C|.
+%format FORGET = "\F{FORGET}"
+%if False
+\begin{code}
+  open Cat
+\end{code}
+%endif
+\begin{code}
+  FORGET : El (Functor (DISCRETE C.Obj) C)
+  FORGET
+    =  (\ X -> X)                -- objects map to themselves
+    ,  (\ { splatvr -> C.id })   -- arrows map to identities
+    ,  (\ { {_}{_}{splatvr}{splatvr} _ -> eq (Rf (C.Arr _ _) _) })
+    ,  rS 
+    ,  \ { splatvr splatvr -> 
+         C.id           ~< C.idco _ ]~
+         C.id C.- C.id  ~[SQED] }
+\end{code}
+\end{definition}
+
+To see our machinery working harder, let us build the category of categories,
+with functors for arrows.
+
+\begin{lemma}[Category of Categories]
+Fix sizes for objects and arrows.
+\begin{code}
+module _ (k l : Level) where
+\end{code}
+%if False
+\begin{code}
+  open Cat
+\end{code}
+%endif
+There is a category whose objects are |Cat|egories and whose arrows are |Functor|s
+%format CAT = "\F{CAT}"
+\begin{code}
+  CAT : Cat (lsuc (k \-/ l)) (k \-/ l)
+  Obj   CAT = Cat k l
+  Arr   CAT = Functor
+\end{code}
+\end{lemma}
+To prove this, we must complete the remaining fields.
+\begin{enumerate}
+\item the identity functor
+\begin{code}
+  id    CAT 
+    =  (\ X -> X)   -- |Map| on objects
+    ,  (\ f -> f)   -- |map| on morphisms
+    ,  (\ q -> q)   -- |map| is extensional
+    ,  rS           -- |map| preserves |id|
+    ,  \ _ _ -> rS  -- |map| preserves |-|
+\end{code}
+\item functor composition
+\begin{code}
+  _-_   CAT {C}{D}{E} (F , Fm , Fx , Fi , Fc) (G , Gm , Gx , Gi , Gc)
+    =  (\ X -> G (F X))    -- compose |Map|s
+    ,  (\ f -> Gm (Fm f))  -- compose |map|s
+    ,  (\ q -> Gx (Fx q))  -- compose extensionality witnesses
+    ,  (   Gm (Fm C.id)               ~[ Gx Fi >~
+           Gm D.id                    ~[ Gi >~
+           E.id                       ~[SQED]) 
+    ,  \ f g -> 
+           Gm (Fm (f C.- g))          ~[ Gx (Fc _ _) >~
+           Gm (Fm f D.- Fm g)         ~[ Gc _ _ >~
+           (Gm (Fm f) E.- Gm (Fm g))  ~[SQED]
+    where
+    private module C = Cat C ; module D = Cat D ; module E = Cat E
+\end{code}
+\item extensionality witness
+\begin{code}
+  qe (coex  CAT  {_}{_}{C}
+             {F , Fm , _}{F' , Fm' , _}{G , Gm , Gx , _}{G' , Gm' , _}
+             (eq (r~ , qf , <>)) (eq (r~ , qg , <>)))
+    =  r~
+    ,  (\ S T f -> qprf (Arr C (G (F S)) (G (F T))) (
+          Gm (Fm f)    ~[ Gx (eq (qf _ _ _)) >~
+          Gm (Fm' f)   ~[ eq (qg _ _ _) >~
+          Gm' (Fm' f)  ~[SQED]))
+    ,  <>
+\end{code}
+\item absorption and associativity -- these are trivial
+\begin{code}
+  idco  CAT {_}{C} _  = eq (r~ , (\ _ _ _ -> qprf (Arr C _ _) rS) , <>)
+  coid  CAT {_}{C} _  = eq (r~ , (\ _ _ _ -> qprf (Arr C _ _) rS) , <>)
+  coco  CAT {_}{_}{_}{C} _ _ _
+    = eq (r~ , (\ _ _ _ -> qprf (Arr C _ _) rS) , <>)
+\end{code}
+\end{enumerate}
+
 
 \bibliographystyle{plain}
 \bibliography{EGTBS}
