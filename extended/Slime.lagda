@@ -1,3 +1,4 @@
+
 \section{When `Green Slime' is Bad, Avoid It}
 
 %if False
@@ -426,9 +427,9 @@ module _ {X : Set} where
 We may readily extract identity absorption laws in equational form.
 \begin{code}
   io~   : {-<-}forall {ga de : Bwd X}{->-}  (th : ga <= de) -> io -<= th ~ th
-  io~ th with _ , v <- io <-> th | splatrr <- v ~-~ io- th = splatr
+  io~ th with _ , v <- io <-> th with splatrr <- v ~-~ io- th = splatr
   _~io  : {-<-}forall {ga de : Bwd X}{->-}  (th : ga <= de) -> th -<= io ~ th
-  th ~io with _ , v <- th <-> io | splatrr <- v ~-~ th -io = splatr
+  th ~io with _ , v <- th <-> io with splatrr <- v ~-~ th -io = splatr
 \end{code}
 \end{lemma}
 
@@ -495,9 +496,9 @@ The more familiar equational form of associativity follows by triangulation.
 \begin{code}
   assoc  : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{->-}  (th01 : ga0 <= ga1)(th12 : ga1 <= ga2)(th23 : ga2 <= ga3)
          ->                                            th01 -<= (th12 -<= th23) ~ (th01 -<= th12) -<= th23
-  assoc th01 th12 th23 with  th13  , v123 <- th12 <-> th23  | th02  , v012 <- th01 <-> th12  |
-                             _     , v013 <- th01 <-> th13  | _     , v023 <- th02 <-> th23  |
-    v013' & v023' <- assoc03 (v012 & v123) | splatrr,rr <- v013 ~-~ v013' , v023 ~-~ v023' = splatr
+  assoc th01 th12 th23 with  th13  , v123 <- th12 <-> th23  | th02  , v012 <- th01 <-> th12
+                       with  _     , v013 <- th01 <-> th13  | _     , v023 <- th02 <-> th23 |
+        v013' & v023' <- assoc03 (v012 & v123) with splatrr,rr <- v013 ~-~ v013' , v023 ~-~ v023' = splatr
 \end{code}
 \end{lemma}
 
@@ -526,16 +527,16 @@ We may also derive the other two forms of diagrammatic composition.
 %format assoc02 = "\F{assoc02}"
 %format assoc13 = "\F{assoc13}"
 \begin{code}
-  assoc02 : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{th01 : ga0 <= ga1}{th03 : ga0 <= ga3}{th12 : ga1 <= ga2}{th23 : ga2 <= ga3}  -> {->-}  <(CTS2 th01 th03) :* (CTS3 th12 th23)> 
+  assoc02 : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{th01 : ga0 <= ga1}{th03 : ga0 <= ga3}{th12 : ga1 <= ga2}{th23 : ga2 <= ga3}  -> {->-}  <(CTS2 th01 th03) :* (CTS3 th12 th23)>
            ->                                                                                                                            <(CTS3 th01 th12) :* (CTS1 th23 th03)>
-  assoc02 {th01 = th01}{th12 = th12} (v013 & v123) with th02 , v012 <- th01 <-> th12 |
-    v013' & v023 <- assoc03 (v012 & v123) | splatrr <- v013 ~-~ v013'
+  assoc02 {th01 = th01}{th12 = th12} (v013 & v123) with th02 , v012 <- th01 <-> th12 with
+     v013' & v023 <- assoc03 (v012 & v123) with splatrr <- v013 ~-~ v013'
     = v012 & v023
 
-  assoc13 : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{th01 : ga0 <= ga1}{th03 : ga0 <= ga3}{th12 : ga1 <= ga2}{th23 : ga2 <= ga3}  -> {->-}  <(CTS3 th01 th12) :* (CTS1 th23 th03)> 
+  assoc13 : {-<-}forall {ga0 ga1 ga2 ga3 : Bwd X}{th01 : ga0 <= ga1}{th03 : ga0 <= ga3}{th12 : ga1 <= ga2}{th23 : ga2 <= ga3}  -> {->-}  <(CTS3 th01 th12) :* (CTS1 th23 th03)>
            ->                                                                                                                            <(CTS2 th01 th03) :* (CTS3 th12 th23)>
-  assoc13 {th12 = th12}{th23 = th23} (v012 & v023) with th13 , v123 <- th12 <-> th23 |
-    v013 & v023' <- assoc03 (v012 & v123) | splatrr <- v023 ~-~ v023'
+  assoc13 {th12 = th12}{th23 = th23} (v012 & v023) with th13 , v123 <- th12 <-> th23 with
+      v013 & v023' <- assoc03 (v012 & v123) with splatrr <- v023 ~-~ v023'
     = v013 & v123
 \end{code}
 That is, we construct the missing arrow and one of the triangles by composition.
