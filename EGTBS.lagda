@@ -1630,7 +1630,7 @@ data TmR {-<-}{I}{->-}(D : I -> Desc I)(i : I) : (Cix (Kind I)) where
 We can compute co-de-Bruijn terms from de Bruijn terms, generically.
 \begin{code}
 code   : {-<-}forall {I}{D : I -> Desc I}{i}  ->{->-}  Tm D i           -:>  (TmR D i /_)
-codes  : {-<-}forall {I}{D : I -> Desc I}{->-} S   ->  [! S !! Tm D !]  -:>  ([! S !! TmR D !]R /_)
+codes  : forall {-<-}{I}{D : I -> Desc I}{->-} S   ->  [! S !! Tm D !]  -:>  ([! S !! TmR D !]R /_)
 code                    (_#$_ {jz} x ts)  = map/ #    (vaR x ,R codes (SpD jz) ts)
 code {D = D}{i = i}     [ ts ]            = map/ [_]  (codes (D i) ts)
 codes (RecD k)          t                 = scope k \\R code t
